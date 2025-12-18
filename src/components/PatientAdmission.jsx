@@ -1,6 +1,7 @@
 // src/components/PatientAdmission.jsx
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { useData } from "../context/DataContext";
 import { ActivityLogger } from "../utils/activityTracker";
 import "../styles/PatientAdmission.css";
 
@@ -12,31 +13,16 @@ export default function PatientAdmission() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPatient, setSelectedPatient] = useState(null);
-  const [patients, setPatients] = useState([]);
   const [availableBeds, setAvailableBeds] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Fetch patients and beds from MongoDB
+  // Use shared data context
+  const { patients, setPatients, fetchPatients, fetchBeds } = useData();
+
+  // Fetch available beds
   useEffect(() => {
-    fetchPatients();
     fetchAvailableBeds();
   }, []);
-
-  const fetchPatients = async () => {
-    try {
-      setLoading(true);
-      const response = await axios.get('http://localhost:5001/api/patients');
-      setPatients(response.data || []);
-      setError(null);
-    } catch (err) {
-      setError('Failed to fetch patients. Make sure the backend is running.');
-      console.error('Error fetching patients:', err);
-      setPatients([]);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const fetchAvailableBeds = async () => {
     try {
@@ -64,22 +50,21 @@ export default function PatientAdmission() {
     return matchesStatus && matchesSearch;
   });
 
-  // CREATE - Add new patient and update bed status
+  // CREATE - Add new patient
   const handleAddPatient = async (formData) => {
     try {
-      // Create patient
       const response = await axios.post('http://localhost:5001/api/patients', {
         ...formData,
         admissionDate: new Date().toISOString(),
         status: "admitted"
       });
       
+      // Update context immediately
       setPatients([...patients, response.data]);
-
-      // Log activity AFTER successful operation
+      
       ActivityLogger.patientAdded(formData.name);
 
-      // If bed is assigned, update bed status to occupied
+      // Update bed status if assigned
       if (formData.bedId) {
         try {
           const bedsResponse = await axios.get('http://localhost:5001/api/beds');
@@ -92,7 +77,9 @@ export default function PatientAdmission() {
               assignedDate: new Date().toISOString()
             });
 
-            // Create notification for patient admission
+            // Refresh beds in context
+            fetchBeds();
+
             await axios.post('http://localhost:5001/api/notifications', {
               type: 'patient',
               title: 'Patient Admitted',
@@ -102,10 +89,8 @@ export default function PatientAdmission() {
           }
         } catch (bedErr) {
           console.error('Error updating bed:', bedErr);
-          // Continue even if bed update fails
         }
       } else {
-        // Create notification for patient admission without bed
         await axios.post('http://localhost:5001/api/notifications', {
           type: 'patient',
           title: 'Patient Admitted',
@@ -116,7 +101,7 @@ export default function PatientAdmission() {
 
       setShowAddModal(false);
       setError(null);
-      fetchAvailableBeds(); // Refresh available beds
+      fetchAvailableBeds();
     } catch (err) {
       setError('Failed to add patient');
       console.error('Error adding patient:', err);
@@ -129,14 +114,14 @@ export default function PatientAdmission() {
     try {
       const oldPatient = patients.find(p => p._id === patientId);
       const response = await axios.put(`http://localhost:5001/api/patients/${patientId}`, formData);
+      
+      // Update context immediately
       setPatients(patients.map(p => p._id === patientId ? response.data : p));
 
-      // Log activity AFTER successful operation
       ActivityLogger.patientUpdated(formData.name);
 
-      // If bed changed, update old and new beds
+      // Update bed assignments if changed
       if (oldPatient.bedId !== formData.bedId) {
-        // Free up old bed
         if (oldPatient.bedId) {
           try {
             const bedsResponse = await axios.get('http://localhost:5001/api/beds');
@@ -153,7 +138,6 @@ export default function PatientAdmission() {
           }
         }
 
-        // Occupy new bed
         if (formData.bedId) {
           try {
             const bedsResponse = await axios.get('http://localhost:5001/api/beds');
@@ -170,6 +154,8 @@ export default function PatientAdmission() {
           }
         }
 
+        // Refresh beds in context
+        fetchBeds();
         fetchAvailableBeds();
       }
 
@@ -202,10 +188,8 @@ export default function PatientAdmission() {
 
       const response = await axios.post('http://localhost:5001/api/transfers', transferData);
 
-      // Log activity AFTER successful operation
       ActivityLogger.transferRequested(selectedPatient.name);
 
-      // Create notification for transfer request
       try {
         await axios.post('http://localhost:5001/api/notifications', {
           type: 'transfer',
@@ -230,7 +214,7 @@ export default function PatientAdmission() {
     }
   };
 
-  // DELETE - Discharge patient and free up bed
+  // DELETE - Discharge patient
   const handleDischarge = async (patientId) => {
     const patient = patients.find(p => p._id === patientId);
     
@@ -239,11 +223,11 @@ export default function PatientAdmission() {
     }
     
     try {
-      // Delete patient
       await axios.delete(`http://localhost:5001/api/patients/${patientId}`);
+      
+      // Update context immediately
       setPatients(patients.filter(p => p._id !== patientId));
 
-      // Log activity AFTER successful operation
       ActivityLogger.patientDischarged(patient.name);
 
       // Free up bed if assigned
@@ -259,7 +243,9 @@ export default function PatientAdmission() {
               assignedDate: null
             });
 
-            // Create notification for discharge and bed availability
+            // Refresh beds in context
+            fetchBeds();
+
             await axios.post('http://localhost:5001/api/notifications', {
               type: 'patient',
               title: 'Patient Discharged - Bed Available',
@@ -271,7 +257,6 @@ export default function PatientAdmission() {
           console.error('Error updating bed:', bedErr);
         }
       } else {
-        // Create notification for discharge without bed
         await axios.post('http://localhost:5001/api/notifications', {
           type: 'patient',
           title: 'Patient Discharged',
@@ -282,24 +267,13 @@ export default function PatientAdmission() {
 
       setSelectedPatient(null);
       setError(null);
-      fetchAvailableBeds(); // Refresh available beds
+      fetchAvailableBeds();
     } catch (err) {
       setError('Failed to discharge patient');
       console.error('Error discharging patient:', err);
       alert('Failed to discharge patient. Please try again.');
     }
   };
-
-  if (loading) {
-    return (
-      <div className="patient-admission">
-        <div className="loading-state">
-          <div className="spinner"></div>
-          <p>Loading patients...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="patient-admission">
@@ -320,7 +294,6 @@ export default function PatientAdmission() {
         </div>
       )}
 
-      {/* Stats */}
       <div className="admission-stats">
         <div className="stat-card">
           <div className="stat-icon">👥</div>
@@ -352,7 +325,6 @@ export default function PatientAdmission() {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="admission-filters">
         <div className="filter-left">
           <input
@@ -388,7 +360,6 @@ export default function PatientAdmission() {
         </div>
       </div>
 
-      {/* Patients List/Grid */}
       <div className={`patients-container ${viewMode}`}>
         {filteredPatients.length === 0 ? (
           <div className="empty-state">
@@ -492,7 +463,7 @@ export default function PatientAdmission() {
         )}
       </div>
 
-      {/* Add Patient Modal - with bed selection */}
+      {/* Add Patient Modal */}
       {showAddModal && (
         <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -503,9 +474,6 @@ export default function PatientAdmission() {
             <div className="modal-body">
               <form onSubmit={(e) => {
                 e.preventDefault();
-                const wardSelect = e.target.ward.value;
-                const bedSelect = e.target.bedId.value;
-                
                 const formData = {
                   patientId: e.target.patientId.value,
                   name: e.target.name.value,
@@ -513,8 +481,8 @@ export default function PatientAdmission() {
                   gender: e.target.gender.value,
                   contact: e.target.contact.value,
                   diagnosis: e.target.diagnosis.value,
-                  bedId: bedSelect || null,
-                  ward: wardSelect || null,
+                  bedId: e.target.bedId.value || null,
+                  ward: e.target.ward.value || null,
                   emergencyContact: e.target.emergencyContact.value,
                 };
                 handleAddPatient(formData);

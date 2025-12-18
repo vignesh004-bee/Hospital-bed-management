@@ -489,3 +489,91 @@
     font-size: 10px;
   }
 }
+/* ============================= */
+/* MOBILE & TABLET SAFETY PATCH  */
+/* ============================= */
+
+/* Prevent horizontal scrolling issues */
+html, body {
+  overflow-x: hidden;
+}
+
+/* Ensure all main containers shrink properly on mobile */
+.notifications,
+.patient-admission,
+.profile,
+.staff-schedule,
+.transfer-requests {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Improve touch scrolling on mobile */
+.notifications-list,
+.patients-container,
+.staff-grid,
+.requests-grid {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Ensure sticky headers don’t overlap content */
+.notifications-header,
+.admission-header,
+.staff-header,
+.transfer-header {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Improve button tap size on small devices */
+button,
+.action-btn,
+.add-patient-btn,
+.create-request-btn {
+  touch-action: manipulation;
+}
+
+/* Make header action rows wrap safely */
+.header-actions {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Fix grid overflow on very small screens */
+@media (max-width: 360px) {
+  .notifications-stats,
+  .admission-stats,
+  .staff-stats,
+  .transfer-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .stat-card {
+    padding: 14px;
+  }
+
+  .notification-card,
+  .patient-card,
+  .staff-card,
+  .request-card {
+    padding: 14px;
+  }
+}
+
+/* Safe modal sizing on very small screens */
+@media (max-width: 360px) {
+  .modal-content {
+    max-height: 85vh;
+  }
+}
+/* ===============================
+   GLOBAL RESPONSIVE SAFETY
+   =============================== */
+html, body {
+  overflow-x: hidden;
+}
+
+* {
+  max-width: 100%;
+}

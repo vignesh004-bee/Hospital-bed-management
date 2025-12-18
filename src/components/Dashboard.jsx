@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import axios from "axios";
+import { useData } from "../context/DataContext";
 import BedManagement from "./BedManagement";
 import PatientAdmission from "./PatientAdmission";
 import EquipmentTracking from "./EquipmentTracking";
@@ -17,18 +17,11 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [activeMenu, setActiveMenu] = useState("dashboard");
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchResults, setSearchResults] = useState(null);
   
-  // Real-time data states
-  const [beds, setBeds] = useState([]);
-  const [patients, setPatients] = useState([]);
-  const [staff, setStaff] = useState([]);
-  const [transfers, setTransfers] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  // Fetch all data
-  useEffect(() => {
-    fetchAllData();
-  }, []);
+  // Get shared data from context
+  const { beds, patients, staff, transfers, loading, fetchAllData } = useData();
 
   // Auto-refresh every 30 seconds
   useEffect(() => {
@@ -38,27 +31,43 @@ export default function Dashboard() {
       }, 30000);
       return () => clearInterval(interval);
     }
-  }, [autoRefresh, activeMenu]);
+  }, [autoRefresh, activeMenu, fetchAllData]);
 
-  const fetchAllData = async () => {
-    try {
-      const [bedsRes, patientsRes, staffRes, transfersRes] = await Promise.all([
-        axios.get('http://localhost:5001/api/beds'),
-        axios.get('http://localhost:5001/api/patients'),
-        axios.get('http://localhost:5001/api/staff'),
-        axios.get('http://localhost:5001/api/transfers')
-      ]);
-
-      setBeds(bedsRes.data || []);
-      setPatients(patientsRes.data || []);
-      setStaff(staffRes.data || []);
-      setTransfers(transfersRes.data || []);
-    } catch (err) {
-      console.error('Error fetching data:', err);
-    } finally {
-      setLoading(false);
+  // Search functionality
+  useEffect(() => {
+    if (searchTerm.trim() === "") {
+      setSearchResults(null);
+      return;
     }
-  };
+
+    const term = searchTerm.toLowerCase();
+    const results = {
+      patients: patients.filter(p => 
+        p.name.toLowerCase().includes(term) ||
+        p.patientId.toLowerCase().includes(term) ||
+        (p.diagnosis && p.diagnosis.toLowerCase().includes(term))
+      ),
+      beds: beds.filter(b => 
+        b.bedId.toLowerCase().includes(term) ||
+        b.ward.toLowerCase().includes(term) ||
+        (b.patient && b.patient.toLowerCase().includes(term))
+      ),
+      staff: staff.filter(s => 
+        s.name.toLowerCase().includes(term) ||
+        s.staffId.toLowerCase().includes(term) ||
+        s.role.toLowerCase().includes(term) ||
+        s.department.toLowerCase().includes(term)
+      ),
+      transfers: transfers.filter(t => 
+        t.patientName.toLowerCase().includes(term) ||
+        t.patientIdNumber.toLowerCase().includes(term) ||
+        t.fromWard.toLowerCase().includes(term) ||
+        t.toWard.toLowerCase().includes(term)
+      )
+    };
+
+    setSearchResults(results);
+  }, [searchTerm, patients, beds, staff, transfers]);
 
   const handleLogout = () => {
     logout();
@@ -73,6 +82,8 @@ export default function Dashboard() {
 
   const handleMenuClick = (menu) => {
     setActiveMenu(menu);
+    setSearchTerm("");
+    setSearchResults(null);
   };
 
   const handleViewDetails = () => {
@@ -91,7 +102,7 @@ export default function Dashboard() {
     onDutyStaff: staff.filter(s => s.currentStatus === "on-duty").length,
     pendingTransfers: transfers.filter(t => t.status === "pending").length,
     occupancyRate: beds.length > 0 ? Math.round((beds.filter(b => b.status === "occupied").length / beds.length) * 100) : 0,
-    avgStayDays: 3.5 // This could be calculated from patient admission dates
+    avgStayDays: 3.5
   };
 
   // Calculate time remaining
@@ -112,7 +123,6 @@ export default function Dashboard() {
     return `${diffHrs}h ${diffMins}m remaining`;
   };
 
-  // Get stage icon
   const getStageIcon = (stage) => {
     switch(stage) {
       case "Admission": return "📋";
@@ -124,7 +134,6 @@ export default function Dashboard() {
     }
   };
 
-  // Get stage color
   const getStageColor = (status) => {
     switch(status) {
       case "completed": return "#000000";
@@ -139,12 +148,10 @@ export default function Dashboard() {
     return patients
       .filter(p => p.status === "admitted")
       .map(patient => {
-        // Calculate journey progress based on admission date
         const admissionDate = new Date(patient.admissionDate);
         const now = new Date();
         const daysSinceAdmission = Math.floor((now - admissionDate) / (1000 * 60 * 60 * 24));
         
-        // Determine current stage based on days
         let currentStage = "Admission";
         let progress = 10;
         const stages = [
@@ -186,7 +193,6 @@ export default function Dashboard() {
           progress = 95;
         }
 
-        // Get assigned staff from database
         const assignedStaff = {};
         const wardStaff = staff.filter(s => 
           s.department === patient.ward && s.currentStatus === "on-duty"
@@ -197,7 +203,6 @@ export default function Dashboard() {
           assignedStaff[currentStage] = randomStaff.name;
         }
 
-        // Calculate estimated completion (5 days from admission)
         const estimatedCompletion = new Date(admissionDate);
         estimatedCompletion.setDate(estimatedCompletion.getDate() + 5);
 
@@ -222,7 +227,6 @@ export default function Dashboard() {
 
   const activeJourneys = getActiveJourneys();
 
-  // Stats for display
   const stats = [
     { value: analytics.totalBeds, label: "Total Beds" },
     { value: analytics.admittedPatients, label: "Active Patients" },
@@ -237,7 +241,6 @@ export default function Dashboard() {
     { value: analytics.totalPatients, label: "Total Patients", icon: "👥" }
   ];
 
-  // Generate dynamic alert based on real data
   const getAlertMessage = () => {
     const occupancy = analytics.occupancyRate;
     
@@ -306,7 +309,6 @@ export default function Dashboard() {
               </button>
             </div>
 
-            {/* Page Title */}
             <div className="page-header">
               <h1 className="page-title">Dashboard Overview</h1>
               <div className="breadcrumb">
@@ -314,7 +316,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Live Stats Grid */}
             <div className="dashboard-stats">
               {stats.map((stat, index) => (
                 <div key={index} className="dashboard-stat-card">
@@ -324,7 +325,6 @@ export default function Dashboard() {
               ))}
             </div>
 
-            {/* Journey Tracker Section */}
             <div className="card">
               <div className="card-header">
                 <div className="card-header-left">
@@ -379,7 +379,6 @@ export default function Dashboard() {
                         <strong>{getStageIcon(journey.currentStage)} {journey.currentStage}</strong>
                       </div>
 
-                      {/* Staff Assignment */}
                       {journey.assignedStaff && journey.assignedStaff[journey.currentStage] && (
                         <div className="assigned-staff">
                           <span className="staff-icon">👨‍⚕️</span>
@@ -387,7 +386,6 @@ export default function Dashboard() {
                         </div>
                       )}
 
-                      {/* Stage Timeline */}
                       <div className="stage-timeline">
                         {journey.stages.map((stage, index) => (
                           <div 
@@ -434,7 +432,6 @@ export default function Dashboard() {
                         <span>{calculateTimeRemaining(journey.estimatedCompletion)}</span>
                       </div>
 
-                      {/* Alerts */}
                       {journey.alerts && journey.alerts.length > 0 && (
                         <div className="journey-alerts">
                           {journey.alerts.slice(0, 2).map((alert, idx) => (
@@ -460,7 +457,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Metrics Grid */}
             <div className="metrics-grid">
               {metrics.map((metric, index) => (
                 <div key={index} className="metric-card">
@@ -488,7 +484,6 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard-container">
-      {/* Sidebar */}
       <aside className="sidebar">
         <div className="sidebar-header">
           <div className="logo">M+</div>
@@ -558,9 +553,7 @@ export default function Dashboard() {
         </nav>
       </aside>
 
-      {/* Main Content */}
       <main className="main-content">
-        {/* Header */}
         <header className="dashboard-header">
           <div className="search-bar">
             <span className="search-icon">🔍</span>
@@ -568,7 +561,73 @@ export default function Dashboard() {
               type="text"
               placeholder="Search patients, beds, equipment, staff..."
               className="search-input"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
+            {searchResults && (
+              <div className="search-dropdown">
+                {searchResults.patients.length === 0 && 
+                 searchResults.beds.length === 0 && 
+                 searchResults.staff.length === 0 && 
+                 searchResults.transfers.length === 0 ? (
+                  <div className="search-empty">No results found for "{searchTerm}"</div>
+                ) : (
+                  <>
+                    {searchResults.patients.length > 0 && (
+                      <div className="search-section">
+                        <div className="search-section-title">Patients ({searchResults.patients.length})</div>
+                        {searchResults.patients.slice(0, 3).map(p => (
+                          <div key={p._id} className="search-item" onClick={() => {
+                            handleMenuClick('patients');
+                            setSearchTerm('');
+                          }}>
+                            <span className="search-icon">👤</span>
+                            <div>
+                              <div className="search-item-title">{p.name}</div>
+                              <div className="search-item-sub">{p.patientId} - {p.diagnosis}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {searchResults.beds.length > 0 && (
+                      <div className="search-section">
+                        <div className="search-section-title">Beds ({searchResults.beds.length})</div>
+                        {searchResults.beds.slice(0, 3).map(b => (
+                          <div key={b._id} className="search-item" onClick={() => {
+                            handleMenuClick('beds');
+                            setSearchTerm('');
+                          }}>
+                            <span className="search-icon">🛏️</span>
+                            <div>
+                              <div className="search-item-title">{b.bedId} - {b.ward}</div>
+                              <div className="search-item-sub">Status: {b.status}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {searchResults.staff.length > 0 && (
+                      <div className="search-section">
+                        <div className="search-section-title">Staff ({searchResults.staff.length})</div>
+                        {searchResults.staff.slice(0, 3).map(s => (
+                          <div key={s._id} className="search-item" onClick={() => {
+                            handleMenuClick('staff');
+                            setSearchTerm('');
+                          }}>
+                            <span className="search-icon">👨‍⚕️</span>
+                            <div>
+                              <div className="search-item-title">{s.name}</div>
+                              <div className="search-item-sub">{s.role} - {s.department}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="header-right">
@@ -598,7 +657,6 @@ export default function Dashboard() {
           </div>
         </header>
 
-        {/* Dynamic Content */}
         {renderContent()}
       </main>
     </div>

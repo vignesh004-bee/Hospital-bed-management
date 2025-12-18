@@ -666,3 +666,27 @@
     padding: 16px;
   }
 }
+@media (max-width: 360px) {
+  .bed-card {
+    padding: 12px;
+  }
+
+  .bed-id {
+    font-size: 13px;
+  }
+
+  .action-btn {
+    width: 100%;
+    text-align: center;
+  }
+}
+/* ===============================
+   GLOBAL RESPONSIVE SAFETY
+   =============================== */
+html, body {
+  overflow-x: hidden;
+}
+
+* {
+  max-width: 100%;
+}

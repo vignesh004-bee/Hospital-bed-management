@@ -644,3 +644,26 @@
     padding: 16px;
   }
 }
+@media (max-width: 360px) {
+  .equipment-card {
+    padding: 12px;
+  }
+
+  .equipment-name {
+    font-size: 14px;
+  }
+
+  .action-btn {
+    width: 100%;
+  }
+}
+/* ===============================
+   GLOBAL RESPONSIVE SAFETY
+   =============================== */
+html, body {
+  overflow-x: hidden;
+}
+
+* {
+  max-width: 100%;
+}

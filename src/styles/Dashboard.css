@@ -918,3 +918,174 @@ body, html {
   color: #6c757d;
   font-weight: 500;
 }
+/* ===============================
+   RESPONSIVE SIDEBAR
+   =============================== */
+
+/* Hide sidebar on small screens */
+@media (max-width: 1024px) {
+  .sidebar {
+    position: fixed;
+    left: -260px;
+    top: 0;
+    height: 100vh;
+    z-index: 1000;
+    transition: left 0.3s ease;
+  }
+
+  .sidebar.open {
+    left: 0;
+  }
+
+  .dashboard-container {
+    position: relative;
+  }
+
+  .main-content {
+    width: 100%;
+  }
+}
+
+/* Mobile header spacing */
+@media (max-width: 768px) {
+  .dashboard-header {
+    padding: 12px 16px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .search-bar {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .header-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+/* Extra small phones */
+@media (max-width: 360px) {
+  .user-name {
+    display: none;
+  }
+
+  .logout-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+}
+/* ===============================
+   GLOBAL RESPONSIVE SAFETY
+   =============================== */
+html, body {
+  overflow-x: hidden;
+}
+
+* {
+  max-width: 100%;
+}
+/* Add this to your Dashboard.css file */
+
+/* Search Bar Styles */
+.search-bar {
+  position: relative;
+  flex: 1;
+  max-width: 600px;
+}
+
+.search-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  max-height: 500px;
+  overflow-y: auto;
+  z-index: 1000;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.search-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.search-section {
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.search-section:last-child {
+  border-bottom: none;
+}
+
+.search-section-title {
+  padding: 12px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: #f9fafb;
+}
+
+.search-item {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-left: 3px solid transparent;
+}
+
+.search-item:hover {
+  background: #f9fafb;
+  border-left-color: #000;
+}
+
+.search-item .search-icon {
+  font-size: 20px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.search-item-title {
+  font-weight: 600;
+  color: #111827;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+
+.search-item-sub {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* Close dropdown when clicking outside */
+.search-bar:focus-within .search-dropdown {
+  display: block;
+}

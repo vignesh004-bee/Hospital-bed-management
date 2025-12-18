@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { HospitalProvider } from "./context/HospitalContext";
+import { DataProvider } from "./context/DataContext";
 
 import Login from "./components/Login";
 import Dashboard from "./components/Dashboard";
@@ -111,57 +112,59 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <HospitalProvider>
-          <Routes>
-            {/* Public Route - Login */}
-            <Route 
-              path="/login" 
-              element={
-                <PublicRoute>
-                  <Login />
-                </PublicRoute>
-              } 
-            />
+          <DataProvider>
+            <Routes>
+              {/* Public Route - Login */}
+              <Route 
+                path="/login" 
+                element={
+                  <PublicRoute>
+                    <Login />
+                  </PublicRoute>
+                } 
+              />
 
-            {/* Protected Route - Dashboard */}
-            <Route 
-              path="/dashboard" 
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              } 
-            />
+              {/* Protected Route - Dashboard */}
+              <Route 
+                path="/dashboard" 
+                element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                } 
+              />
 
-            {/* Root redirect - goes to dashboard if logged in, otherwise to login */}
-            <Route 
-              path="/" 
-              element={
-                <Navigate 
-                  to={
-                    sessionStorage.getItem("token") || localStorage.getItem("token") 
-                      ? "/dashboard" 
-                      : "/login"
-                  } 
-                  replace 
-                />
-              } 
-            />
+              {/* Root redirect - goes to dashboard if logged in, otherwise to login */}
+              <Route 
+                path="/" 
+                element={
+                  <Navigate 
+                    to={
+                      sessionStorage.getItem("token") || localStorage.getItem("token") 
+                        ? "/dashboard" 
+                        : "/login"
+                    } 
+                    replace 
+                  />
+                } 
+              />
 
-            {/* Catch all routes - redirect to dashboard or login */}
-            <Route 
-              path="*" 
-              element={
-                <Navigate 
-                  to={
-                    sessionStorage.getItem("token") || localStorage.getItem("token") 
-                      ? "/dashboard" 
-                      : "/login"
-                  } 
-                  replace 
-                />
-              } 
-            />
-          </Routes>
+              {/* Catch all routes - redirect to dashboard or login */}
+              <Route 
+                path="*" 
+                element={
+                  <Navigate 
+                    to={
+                      sessionStorage.getItem("token") || localStorage.getItem("token") 
+                        ? "/dashboard" 
+                        : "/login"
+                    } 
+                    replace 
+                  />
+                } 
+              />
+            </Routes>
+          </DataProvider>
         </HospitalProvider>
       </AuthProvider>
     </BrowserRouter>

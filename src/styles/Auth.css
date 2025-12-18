@@ -431,3 +431,29 @@ html, body, #root {
     padding: 24px 20px;
   }
 }
+@media (max-width: 360px) {
+  .brand-title {
+    font-size: 20px;
+  }
+
+  .btn-primary,
+  .btn-google {
+    padding: 12px;
+    font-size: 13px;
+  }
+
+  .input-group input {
+    font-size: 13px;
+    padding: 10px 12px;
+  }
+}
+/* ===============================
+   GLOBAL RESPONSIVE SAFETY
+   =============================== */
+html, body {
+  overflow-x: hidden;
+}
+
+* {
+  max-width: 100%;
+}
