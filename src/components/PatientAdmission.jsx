@@ -1,6 +1,6 @@
 // src/components/PatientAdmission.jsx
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import API from "../api/api"; // ✅ Use centralized API
 import { useData } from "../context/DataContext";
 import { ActivityLogger } from "../utils/activityTracker";
 import "../styles/PatientAdmission.css";
@@ -26,7 +26,7 @@ export default function PatientAdmission() {
 
   const fetchAvailableBeds = async () => {
     try {
-      const response = await axios.get('http://localhost:5001/api/beds');
+      const response = await API.get('/beds');
       const available = response.data.filter(bed => bed.status === 'available');
       setAvailableBeds(available);
     } catch (err) {
@@ -53,7 +53,7 @@ export default function PatientAdmission() {
   // CREATE - Add new patient
   const handleAddPatient = async (formData) => {
     try {
-      const response = await axios.post('http://localhost:5001/api/patients', {
+      const response = await API.post('/patients', {
         ...formData,
         admissionDate: new Date().toISOString(),
         status: "admitted"
@@ -67,11 +67,11 @@ export default function PatientAdmission() {
       // Update bed status if assigned
       if (formData.bedId) {
         try {
-          const bedsResponse = await axios.get('http://localhost:5001/api/beds');
+          const bedsResponse = await API.get('/beds');
           const bed = bedsResponse.data.find(b => b.bedId === formData.bedId);
           
           if (bed) {
-            await axios.patch(`http://localhost:5001/api/beds/${bed._id}/status`, {
+            await API.patch(`/beds/${bed._id}/status`, {
               status: "occupied",
               patient: formData.name,
               assignedDate: new Date().toISOString()
@@ -80,7 +80,7 @@ export default function PatientAdmission() {
             // Refresh beds in context
             fetchBeds();
 
-            await axios.post('http://localhost:5001/api/notifications', {
+            await API.post('/notifications', {
               type: 'patient',
               title: 'Patient Admitted',
               message: `${formData.name} (${formData.patientId}) admitted to bed ${formData.bedId} in ${formData.ward} ward`,
@@ -91,7 +91,7 @@ export default function PatientAdmission() {
           console.error('Error updating bed:', bedErr);
         }
       } else {
-        await axios.post('http://localhost:5001/api/notifications', {
+        await API.post('/notifications', {
           type: 'patient',
           title: 'Patient Admitted',
           message: `${formData.name} (${formData.patientId}) admitted without bed assignment`,
@@ -113,7 +113,7 @@ export default function PatientAdmission() {
   const handleUpdatePatient = async (patientId, formData) => {
     try {
       const oldPatient = patients.find(p => p._id === patientId);
-      const response = await axios.put(`http://localhost:5001/api/patients/${patientId}`, formData);
+      const response = await API.put(`/patients/${patientId}`, formData);
       
       // Update context immediately
       setPatients(patients.map(p => p._id === patientId ? response.data : p));
@@ -124,10 +124,10 @@ export default function PatientAdmission() {
       if (oldPatient.bedId !== formData.bedId) {
         if (oldPatient.bedId) {
           try {
-            const bedsResponse = await axios.get('http://localhost:5001/api/beds');
+            const bedsResponse = await API.get('/beds');
             const oldBed = bedsResponse.data.find(b => b.bedId === oldPatient.bedId);
             if (oldBed) {
-              await axios.patch(`http://localhost:5001/api/beds/${oldBed._id}/status`, {
+              await API.patch(`/beds/${oldBed._id}/status`, {
                 status: "available",
                 patient: null,
                 assignedDate: null
@@ -140,10 +140,10 @@ export default function PatientAdmission() {
 
         if (formData.bedId) {
           try {
-            const bedsResponse = await axios.get('http://localhost:5001/api/beds');
+            const bedsResponse = await API.get('/beds');
             const newBed = bedsResponse.data.find(b => b.bedId === formData.bedId);
             if (newBed) {
-              await axios.patch(`http://localhost:5001/api/beds/${newBed._id}/status`, {
+              await API.patch(`/beds/${newBed._id}/status`, {
                 status: "occupied",
                 patient: formData.name,
                 assignedDate: new Date().toISOString()
@@ -186,12 +186,12 @@ export default function PatientAdmission() {
         notes: formData.notes || ""
       };
 
-      const response = await axios.post('http://localhost:5001/api/transfers', transferData);
+      const response = await API.post('/transfers', transferData);
 
       ActivityLogger.transferRequested(selectedPatient.name);
 
       try {
-        await axios.post('http://localhost:5001/api/notifications', {
+        await API.post('/notifications', {
           type: 'transfer',
           title: 'New Transfer Request',
           message: `Transfer request for ${selectedPatient.name} from ${selectedPatient.ward || 'Not Assigned'} to ${formData.toWard}`,
@@ -223,7 +223,7 @@ export default function PatientAdmission() {
     }
     
     try {
-      await axios.delete(`http://localhost:5001/api/patients/${patientId}`);
+      await API.delete(`/patients/${patientId}`);
       
       // Update context immediately
       setPatients(patients.filter(p => p._id !== patientId));
@@ -233,11 +233,11 @@ export default function PatientAdmission() {
       // Free up bed if assigned
       if (patient.bedId) {
         try {
-          const bedsResponse = await axios.get('http://localhost:5001/api/beds');
+          const bedsResponse = await API.get('/beds');
           const bed = bedsResponse.data.find(b => b.bedId === patient.bedId);
           
           if (bed) {
-            await axios.patch(`http://localhost:5001/api/beds/${bed._id}/status`, {
+            await API.patch(`/beds/${bed._id}/status`, {
               status: "available",
               patient: null,
               assignedDate: null
@@ -246,7 +246,7 @@ export default function PatientAdmission() {
             // Refresh beds in context
             fetchBeds();
 
-            await axios.post('http://localhost:5001/api/notifications', {
+            await API.post('/notifications', {
               type: 'patient',
               title: 'Patient Discharged - Bed Available',
               message: `${patient.name} (${patient.patientId}) discharged. Bed ${patient.bedId} in ${patient.ward} ward is now available`,
@@ -257,7 +257,7 @@ export default function PatientAdmission() {
           console.error('Error updating bed:', bedErr);
         }
       } else {
-        await axios.post('http://localhost:5001/api/notifications', {
+        await API.post('/notifications', {
           type: 'patient',
           title: 'Patient Discharged',
           message: `${patient.name} (${patient.patientId}) has been discharged from the hospital`,

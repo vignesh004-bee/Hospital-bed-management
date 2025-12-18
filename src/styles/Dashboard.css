@@ -986,25 +986,57 @@ html, body {
 * {
   max-width: 100%;
 }
-/* Add this to your Dashboard.css file */
+/* Add/Replace these search bar styles in your Dashboard.css */
 
-/* Search Bar Styles */
+/* Search Bar Styles - Fixed positioning */
 .search-bar {
   position: relative;
   flex: 1;
   max-width: 600px;
 }
 
+.search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 14px;
+  color: #adb5bd;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.search-input {
+  width: 100%;
+  padding: 8px 12px 8px 36px;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  font-size: 13px;
+  background: #f8f9fa;
+  transition: all 0.2s ease;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #000000;
+  background: #ffffff;
+}
+
+.search-input::placeholder {
+  color: #adb5bd;
+}
+
+/* Search Dropdown */
 .search-dropdown {
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
   right: 0;
   background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
-  max-height: 500px;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  max-height: 400px;
   overflow-y: auto;
   z-index: 1000;
   animation: slideDown 0.2s ease-out;
@@ -1022,14 +1054,14 @@ html, body {
 }
 
 .search-empty {
-  padding: 40px 20px;
+  padding: 30px 20px;
   text-align: center;
-  color: #6b7280;
-  font-size: 14px;
+  color: #6c757d;
+  font-size: 13px;
 }
 
 .search-section {
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid #f8f9fa;
 }
 
 .search-section:last-child {
@@ -1037,13 +1069,13 @@ html, body {
 }
 
 .search-section-title {
-  padding: 12px 16px;
-  font-size: 12px;
+  padding: 10px 16px;
+  font-size: 11px;
   font-weight: 600;
-  color: #6b7280;
+  color: #6c757d;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  background: #f9fafb;
+  background: #f8f9fa;
 }
 
 .search-item {
@@ -1054,38 +1086,55 @@ html, body {
   cursor: pointer;
   transition: all 0.2s;
   border-left: 3px solid transparent;
+  background: white;
 }
 
 .search-item:hover {
-  background: #f9fafb;
-  border-left-color: #000;
+  background: #f8f9fa;
+  border-left-color: #000000;
 }
 
 .search-item .search-icon {
-  font-size: 20px;
+  font-size: 18px;
   width: 32px;
   height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f3f4f6;
-  border-radius: 8px;
+  background: #f8f9fa;
+  border-radius: 6px;
   flex-shrink: 0;
+  position: static;
+  transform: none;
+  pointer-events: auto;
 }
 
 .search-item-title {
   font-weight: 600;
-  color: #111827;
-  font-size: 14px;
+  color: #1a1a1a;
+  font-size: 13px;
   margin-bottom: 2px;
 }
 
 .search-item-sub {
-  font-size: 12px;
-  color: #6b7280;
+  font-size: 11px;
+  color: #6c757d;
 }
 
-/* Close dropdown when clicking outside */
-.search-bar:focus-within .search-dropdown {
-  display: block;
+/* Scrollbar for dropdown */
+.search-dropdown::-webkit-scrollbar {
+  width: 6px;
+}
+
+.search-dropdown::-webkit-scrollbar-track {
+  background: #f8f9fa;
+}
+
+.search-dropdown::-webkit-scrollbar-thumb {
+  background: #dee2e6;
+  border-radius: 3px;
+}
+
+.search-dropdown::-webkit-scrollbar-thumb:hover {
+  background: #adb5bd;
 }

@@ -1,6 +1,6 @@
-// src/context/DataContext.jsx
+// src/context/DataContext.jsx - Using centralized API
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import API from '../api/api'; // ✅ Use centralized API config
 
 const DataContext = createContext();
 
@@ -24,10 +24,10 @@ export const DataProvider = ({ children }) => {
   const fetchAllData = useCallback(async () => {
     try {
       const [bedsRes, patientsRes, staffRes, transfersRes] = await Promise.all([
-        axios.get('http://localhost:5001/api/beds'),
-        axios.get('http://localhost:5001/api/patients'),
-        axios.get('http://localhost:5001/api/staff'),
-        axios.get('http://localhost:5001/api/transfers')
+        API.get('/beds'),
+        API.get('/patients'),
+        API.get('/staff'),
+        API.get('/transfers')
       ]);
 
       setBeds(bedsRes.data || []);
@@ -46,7 +46,7 @@ export const DataProvider = ({ children }) => {
   // Fetch individual resources
   const fetchPatients = useCallback(async () => {
     try {
-      const response = await axios.get('http://localhost:5001/api/patients');
+      const response = await API.get('/patients');
       setPatients(response.data || []);
     } catch (err) {
       console.error('Error fetching patients:', err);
@@ -55,7 +55,7 @@ export const DataProvider = ({ children }) => {
 
   const fetchBeds = useCallback(async () => {
     try {
-      const response = await axios.get('http://localhost:5001/api/beds');
+      const response = await API.get('/beds');
       setBeds(response.data || []);
     } catch (err) {
       console.error('Error fetching beds:', err);
@@ -64,7 +64,7 @@ export const DataProvider = ({ children }) => {
 
   const fetchStaff = useCallback(async () => {
     try {
-      const response = await axios.get('http://localhost:5001/api/staff');
+      const response = await API.get('/staff');
       setStaff(response.data || []);
     } catch (err) {
       console.error('Error fetching staff:', err);
@@ -73,7 +73,7 @@ export const DataProvider = ({ children }) => {
 
   const fetchTransfers = useCallback(async () => {
     try {
-      const response = await axios.get('http://localhost:5001/api/transfers');
+      const response = await API.get('/transfers');
       setTransfers(response.data || []);
     } catch (err) {
       console.error('Error fetching transfers:', err);

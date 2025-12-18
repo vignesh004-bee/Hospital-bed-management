@@ -1,26 +1,21 @@
 // frontend/src/api/api.js
 import axios from "axios";
 
-// Get API URL from environment variable or use default
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5001/api";
-
-console.log("🔗 API Base URL:", API_URL);
+// Use environment variable or fallback to production URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://hospital-details-backend.onrender.com';
 
 const API = axios.create({
-  baseURL: API_URL,
+  baseURL: `${API_BASE_URL}/api`,
   headers: {
     "Content-Type": "application/json"
   },
   withCredentials: true,
-  timeout: 10000 // 10 seconds
+  timeout: 30000 // 30 seconds for production (Render can be slower)
 });
 
 // Request interceptor - Check both storage types
 API.interceptors.request.use(
   (config) => {
-    // Log the full URL being called
-    console.log("📡 API Request:", config.method.toUpperCase(), config.baseURL + config.url);
-    
     // Check sessionStorage first (session-only), then localStorage (Remember Me)
     let token = sessionStorage.getItem("token");
     
@@ -46,33 +41,17 @@ API.interceptors.request.use(
 // Response interceptor - Handle 401 errors and token expiration
 API.interceptors.response.use(
   (response) => {
-    console.log("✅ Response received from:", response.config.url);
+    console.log("✅ Response received:", response.config.url);
     return response;
   },
   (error) => {
     console.error("❌ Response error:", error);
 
-    // Handle network errors (backend not running)
+    // Handle network errors
     if (!error.response) {
-      console.error("❌ Network Error - Cannot reach backend");
-      console.error("   Expected URL:", API_URL);
-      console.error("   Is backend running? Check: http://localhost:5001");
-      return Promise.reject({
-        ...error,
-        message: "Cannot connect to server. Please check if backend is running."
-      });
-    }
-
-    // Log the failed URL
-    console.error("   Failed URL:", error.config?.baseURL + error.config?.url);
-    console.error("   Status:", error.response?.status);
-    console.error("   Status Text:", error.response?.statusText);
-
-    // Handle 404 Not Found
-    if (error.response?.status === 404) {
-      console.error("❌ 404 Not Found - Check your API endpoint");
-      console.error("   Requested URL:", error.config.url);
-      console.error("   Full URL:", error.config.baseURL + error.config.url);
+      console.error("❌ Network Error - Backend may be unreachable");
+      console.error(`   Trying to connect to: ${API_BASE_URL}`);
+      return Promise.reject(error);
     }
 
     // Handle 401 Unauthorized (token expired or invalid)
