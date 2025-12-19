@@ -1284,3 +1284,285 @@ html, body {
 * {
   max-width: 100%;
 }
+@media (max-width: 768px) {
+  /* Hide grid/list toggle on all pages */
+  .view-toggle {
+    display: none !important;
+  }
+
+  /* Force list view with scroll snap */
+  .beds-container,
+  .patients-container,
+  .equipment-grid,
+  .staff-grid,
+  .requests-grid,
+  .notifications-list {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 20px;
+    padding: 16px;
+    overflow-y: auto;
+    scroll-snap-type: y proximity;
+    scroll-padding-top: 80px;
+    height: calc(100vh - 280px); /* Adjust based on header height */
+  }
+
+  /* Card scroll snap behavior */
+  .bed-card,
+  .patient-card,
+  .equipment-card,
+  .staff-card,
+  .request-card,
+  .notification-card {
+    scroll-snap-align: center; /* Center cards in viewport */
+    scroll-margin: 40px 0;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 300px;
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    margin-bottom: 0 !important;
+  }
+
+  /* Smooth scroll for all containers */
+  .beds-container,
+  .patients-container,
+  .equipment-grid,
+  .staff-grid,
+  .requests-grid,
+  .notifications-list {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch; /* iOS momentum scrolling */
+  }
+
+  /* Filter sections */
+  .bed-filters,
+  .admission-filters,
+  .equipment-filters,
+  .staff-filters,
+  .transfer-filters,
+  .notifications-filters {
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    position: sticky;
+    top: 60px;
+    background: white;
+    z-index: 10;
+    border-bottom: 1px solid #e9ecef;
+  }
+
+  .filter-left {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .filter-left input,
+  .filter-left select {
+    width: 100%;
+  }
+
+  /* Card body improvements */
+  .bed-card-body,
+  .patient-card-body,
+  .equipment-card-body,
+  .staff-card-body,
+  .request-card-body,
+  .notification-content {
+    padding: 20px;
+    line-height: 1.6;
+  }
+
+  /* Card footer button layout */
+  .bed-card-footer,
+  .patient-card-footer,
+  .equipment-card-footer,
+  .staff-card-footer,
+  .request-card-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 16px 20px;
+    border-top: 1px solid #f8f9fa;
+  }
+
+  .action-btn {
+    flex: 1 1 calc(50% - 5px);
+    min-width: 0;
+    padding: 12px 8px;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .action-btn.primary {
+    flex-basis: 100%;
+  }
+
+  .action-btn.delete {
+    flex-basis: 100%;
+    margin-top: 4px;
+  }
+
+  /* Stats cards layout */
+  .bed-stats,
+  .admission-stats,
+  .equipment-stats,
+  .staff-stats,
+  .transfer-stats,
+  .notifications-stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .stat-card {
+    padding: 16px;
+    min-height: 100px;
+  }
+
+  /* Header improvements */
+  .bed-header,
+  .admission-header,
+  .equipment-header,
+  .staff-header,
+  .transfer-header,
+  .notifications-header {
+    padding: 16px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .add-bed-btn,
+  .add-patient-btn,
+  .add-equipment-btn,
+  .add-staff-btn,
+  .header-actions {
+    width: 100%;
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .header-actions button,
+  .header-actions input[type="date"] {
+    flex: 1;
+    min-width: calc(50% - 4px);
+  }
+
+  /* Empty state */
+  .empty-state {
+    padding: 80px 20px;
+    scroll-snap-align: none;
+  }
+
+  /* Modal improvements for mobile */
+  .modal-content {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    max-height: 90vh;
+    overflow-y: auto;
+    border-radius: 16px;
+  }
+
+  .modal-body {
+    padding: 20px;
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+
+  .form-row {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .form-group {
+    width: 100%;
+  }
+
+  /* Loading and error states */
+  .loading-state,
+  .error-banner {
+    scroll-snap-align: none;
+  }
+
+  /* Better touch targets */
+  button,
+  select,
+  input[type="button"],
+  input[type="submit"],
+  .action-btn {
+    min-height: 44px; /* Apple's recommended minimum touch target */
+    touch-action: manipulation; /* Disable double-tap zoom */
+  }
+
+  /* Prevent zoom on input focus (iOS) */
+  input,
+  select,
+  textarea {
+    font-size: 16px; /* Prevents iOS zoom */
+  }
+
+  /* Badge and status improvements */
+  .status-badge,
+  .priority-badge,
+  .badge {
+    font-size: 11px;
+    padding: 4px 10px;
+    font-weight: 700;
+  }
+}
+
+/* Small mobile devices (480px) */
+@media (max-width: 480px) {
+  .bed-card,
+  .patient-card,
+  .equipment-card,
+  .staff-card,
+  .request-card,
+  .notification-card {
+    min-height: 280px;
+    padding: 16px;
+  }
+
+  .action-btn {
+    flex-basis: 100% !important;
+    margin-bottom: 4px;
+  }
+
+  .stat-card {
+    padding: 12px;
+  }
+
+  .stat-value {
+    font-size: 22px;
+  }
+}
+
+/* Extra small devices (360px) */
+@media (max-width: 360px) {
+  .beds-container,
+  .patients-container,
+  .equipment-grid,
+  .staff-grid,
+  .requests-grid {
+    padding: 12px;
+    gap: 16px;
+  }
+
+  .bed-card,
+  .patient-card,
+  .equipment-card,
+  .staff-card,
+  .request-card {
+    padding: 12px;
+  }
+}
