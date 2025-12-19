@@ -1275,10 +1275,12 @@ font-size: 8px;
 }
 }
 /* Prevent horizontal scroll */
+/* Prevent horizontal scroll */
 html, body {
-overflow-x: hidden;
+  overflow-x: hidden;
 }
 
-{
-max-width: 100%;
+/* Apply max-width safely */
+* {
+  max-width: 100%;
 }
