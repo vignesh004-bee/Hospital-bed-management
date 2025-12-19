@@ -1,6 +1,6 @@
 // src/components/BedManagement.jsx
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import API from "../api/api"; // ✅ Use centralized API
 import { ActivityLogger } from "../utils/activityTracker";
 import "../styles/BedManagement.css";
 
@@ -28,7 +28,7 @@ export default function BedManagement() {
   const fetchBeds = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://localhost:5001/api/beds');
+      const response = await API.get('/beds');
       setBeds(response.data || []);
       setError(null);
     } catch (err) {
@@ -42,7 +42,7 @@ export default function BedManagement() {
 
   const checkOccupancy = async () => {
     try {
-      await axios.get('http://localhost:5001/api/beds/check-occupancy');
+      await API.get('/beds/check-occupancy');
     } catch (err) {
       console.error('Error checking occupancy:', err);
     }
@@ -50,7 +50,7 @@ export default function BedManagement() {
 
   const initializeBeds = async () => {
     try {
-      const response = await axios.post('http://localhost:5001/api/beds/initialize');
+      const response = await API.post('/beds/initialize');
       alert(response.data.message);
       fetchBeds();
     } catch (err) {
@@ -87,35 +87,32 @@ export default function BedManagement() {
         assignedDate: newStatus === "available" ? null : bed?.assignedDate
       };
 
-      const response = await axios.patch(`http://localhost:5001/api/beds/${bedId}/status`, updateData);
+      const response = await API.patch(`/beds/${bedId}/status`, updateData);
       setBeds(beds.map((b) => b._id === bedId ? response.data : b));
       
       // Log activity based on status change
       if (newStatus === "available" && bed?.patient) {
-        // Bed became available after patient discharge
         ActivityLogger.bedReleased(bed.bedId);
         
-        await axios.post('http://localhost:5001/api/notifications', {
+        await API.post('/notifications', {
           type: 'patient',
           title: 'Bed Available',
           message: `Bed ${bed.bedId} in ${bed.ward} ward is now available after patient discharge`,
           actionRequired: false
         });
       } else if (newStatus === "maintenance") {
-        // Bed sent for maintenance
         ActivityLogger.bedMaintenance(bed.bedId);
         
-        await axios.post('http://localhost:5001/api/notifications', {
+        await API.post('/notifications', {
           type: 'equipment',
           title: 'Bed Maintenance',
           message: `Bed ${bed.bedId} in ${bed.ward} ward has been marked for maintenance`,
           actionRequired: true
         });
       } else if (newStatus === "available" && bed?.status === "maintenance") {
-        // Maintenance completed
         ActivityLogger.bedMaintenanceComplete(bed.bedId);
         
-        await axios.post('http://localhost:5001/api/notifications', {
+        await API.post('/notifications', {
           type: 'equipment',
           title: 'Maintenance Complete',
           message: `Bed ${bed.bedId} in ${bed.ward} ward maintenance completed and is now available`,
@@ -143,7 +140,7 @@ export default function BedManagement() {
         assignedDate: new Date().toISOString()
       };
 
-      const bedResponse = await axios.patch(`http://localhost:5001/api/beds/${bedId}/status`, updateData);
+      const bedResponse = await API.patch(`/beds/${bedId}/status`, updateData);
       setBeds(beds.map((b) => b._id === bedId ? bedResponse.data : b));
 
       // Create patient record
@@ -155,13 +152,11 @@ export default function BedManagement() {
         status: "admitted"
       };
 
-      await axios.post('http://localhost:5001/api/patients', patientPayload);
+      await API.post('/patients', patientPayload);
 
-      // Log activity AFTER successful operation
       ActivityLogger.bedAssigned(bed.bedId, patientData.name);
 
-      // Create notification
-      await axios.post('http://localhost:5001/api/notifications', {
+      await API.post('/notifications', {
         type: 'patient',
         title: 'Patient Admitted',
         message: `${patientData.name} (${patientData.patientId}) admitted to bed ${bed.bedId} in ${bed.ward} ward`,
@@ -191,7 +186,7 @@ export default function BedManagement() {
         status: "available"
       };
 
-      const response = await axios.post('http://localhost:5001/api/beds', newBed);
+      const response = await API.post('/beds', newBed);
       setBeds([...beds, response.data]);
       setShowAddBedModal(false);
       setError(null);
@@ -208,7 +203,7 @@ export default function BedManagement() {
     }
 
     try {
-      await axios.delete(`http://localhost:5001/api/beds/${bedId}`);
+      await API.delete(`/beds/${bedId}`);
       setBeds(beds.filter(b => b._id !== bedId));
       setError(null);
     } catch (err) {
@@ -480,7 +475,7 @@ export default function BedManagement() {
         </div>
       )}
 
-      {/* Assign Modal - Enhanced with full patient form */}
+      {/* Assign Modal */}
       {showAssignModal && selectedBed && (
         <div className="modal-overlay" onClick={() => setShowAssignModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>

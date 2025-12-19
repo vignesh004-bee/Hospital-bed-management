@@ -1,4 +1,4 @@
-// src/components/Dashboard.jsx
+// src/components/Dashboard.jsx - Fully Responsive with Hamburger Menu
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -19,6 +19,7 @@ export default function Dashboard() {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false); // Hamburger state
   
   // Get shared data from context
   const { beds, patients, staff, transfers, loading, fetchAllData } = useData();
@@ -32,6 +33,17 @@ export default function Dashboard() {
       return () => clearInterval(interval);
     }
   }, [autoRefresh, activeMenu, fetchAllData]);
+
+  // Close sidebar when clicking outside on mobile
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (sidebarOpen && !e.target.closest('.sidebar') && !e.target.closest('.hamburger-btn')) {
+        setSidebarOpen(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [sidebarOpen]);
 
   // Search functionality
   useEffect(() => {
@@ -84,6 +96,7 @@ export default function Dashboard() {
     setActiveMenu(menu);
     setSearchTerm("");
     setSearchResults(null);
+    setSidebarOpen(false); // Close sidebar on menu click
   };
 
   const handleViewDetails = () => {
@@ -300,7 +313,7 @@ export default function Dashboard() {
             {/* Dynamic Alert Banner */}
             <div className={`alert-banner alert-${alert.level}`}>
               <span className="alert-icon">{alert.icon}</span>
-              <div>
+              <div className="alert-content">
                 <div className="alert-title">{alert.title}</div>
                 <div className="alert-text">{alert.message}</div>
               </div>
@@ -484,7 +497,11 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard-container">
-      <aside className="sidebar">
+      {/* Sidebar Overlay for Mobile */}
+      {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)}></div>}
+
+      {/* Sidebar */}
+      <aside className={`sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <div className="sidebar-header">
           <div className="logo">M+</div>
           <div>
@@ -555,6 +572,20 @@ export default function Dashboard() {
 
       <main className="main-content">
         <header className="dashboard-header">
+          {/* Hamburger Menu Button */}
+          <button 
+            className="hamburger-btn" 
+            onClick={(e) => {
+              e.stopPropagation();
+              setSidebarOpen(!sidebarOpen);
+            }}
+            aria-label="Toggle menu"
+          >
+            <span className={`hamburger-line ${sidebarOpen ? 'open' : ''}`}></span>
+            <span className={`hamburger-line ${sidebarOpen ? 'open' : ''}`}></span>
+            <span className={`hamburger-line ${sidebarOpen ? 'open' : ''}`}></span>
+          </button>
+
           <div className="search-bar">
             <span className="search-icon">🔍</span>
             <input
@@ -638,14 +669,14 @@ export default function Dashboard() {
               <span className="notification-badge">3</span>
             </div>
             
-            <div className="notification-icon">☁</div>
-            <div className="notification-icon">⚡</div>
+            <div className="notification-icon cloud-icon">☁</div>
+            <div className="notification-icon lightning-icon">⚡</div>
             
             <div className="user-info" onClick={() => handleMenuClick('profile')}>
               <div className="user-avatar">
                 {getDisplayName().charAt(0).toUpperCase()}
               </div>
-              <div>
+              <div className="user-details">
                 <div className="user-name">Dr. {getDisplayName()}</div>
                 <div className="user-role">System Manager</div>
               </div>
