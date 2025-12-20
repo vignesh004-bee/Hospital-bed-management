@@ -1,5 +1,5 @@
-// src/components/Notifications.jsx
-import React, { useState, useEffect } from "react";
+// src/components/Notifications.jsx - WITH REAL-TIME UPDATES
+import React, { useState, useEffect, useCallback } from "react";
 import API from "../api/api";
 import "../styles/Notifications.css";
 
@@ -10,14 +10,10 @@ export default function Notifications() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const fetchNotifications = async () => {
+  // ✅ Use useCallback to prevent unnecessary re-renders
+  const fetchNotifications = useCallback(async () => {
     try {
+      if (loading) return; // Prevent multiple simultaneous fetches
       setLoading(true);
       const response = await API.get('/notifications');
       setNotifications(response.data || []);
@@ -29,7 +25,15 @@ export default function Notifications() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [loading]);
+
+  useEffect(() => {
+    fetchNotifications();
+    
+    // ✅ Refresh notifications every 10 seconds for real-time updates
+    const interval = setInterval(fetchNotifications, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   const filteredNotifications = notifications.filter((notif) => {
     const matchesType = filterType === "all" || notif.type === filterType;
@@ -51,9 +55,12 @@ export default function Notifications() {
     
     try {
       await API.patch(`/notifications/${id}/read`);
+      
+      // ✅ Update immediately without refetch
       setNotifications(notifications.map(n => 
         n._id === id ? { ...n, read: true } : n
       ));
+      
       setError(null);
     } catch (err) {
       console.error('Error marking notification as read:', err);
@@ -63,7 +70,10 @@ export default function Notifications() {
   const handleMarkAllAsRead = async () => {
     try {
       await API.patch('/notifications/mark-all/read');
+      
+      // ✅ Update immediately without refetch
       setNotifications(notifications.map(n => ({ ...n, read: true })));
+      
       setError(null);
     } catch (err) {
       setError('Failed to mark all as read');
@@ -79,7 +89,10 @@ export default function Notifications() {
     
     try {
       await API.delete(`/notifications/${id}`);
+      
+      // ✅ Update immediately without refetch
       setNotifications(notifications.filter(n => n._id !== id));
+      
       setError(null);
     } catch (err) {
       console.error('Error deleting notification:', err);
@@ -93,7 +106,10 @@ export default function Notifications() {
     
     try {
       await API.delete('/notifications/clear/all');
+      
+      // ✅ Update immediately without refetch - keep only system notifications
       setNotifications(notifications.filter(n => n.isSystem));
+      
       setError(null);
     } catch (err) {
       setError('Failed to clear notifications');

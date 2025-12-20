@@ -1,6 +1,6 @@
-// src/components/PatientAdmission.jsx
+// src/components/PatientAdmission.jsx - WITH REAL-TIME UPDATES
 import React, { useState, useEffect } from "react";
-import API from "../api/api"; // ✅ Use centralized API
+import API from "../api/api";
 import { useData } from "../context/DataContext";
 import { ActivityLogger } from "../utils/activityTracker";
 import "../styles/PatientAdmission.css";
@@ -15,14 +15,28 @@ export default function PatientAdmission() {
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [availableBeds, setAvailableBeds] = useState([]);
   const [error, setError] = useState(null);
+  const [isMobile, setIsMobile] = useState(false);
 
-  // Use shared data context
-  const { patients, setPatients, fetchPatients, fetchBeds } = useData();
+  // ✅ Use shared data context for real-time updates
+  const { patients, setPatients, beds, setBeds, fetchBeds } = useData();
 
-  // Fetch available beds
   useEffect(() => {
     fetchAvailableBeds();
+    
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // ✅ Update available beds when beds context changes
+  useEffect(() => {
+    const available = beds.filter(bed => bed.status === 'available');
+    setAvailableBeds(available);
+  }, [beds]);
 
   const fetchAvailableBeds = async () => {
     try {
@@ -50,7 +64,6 @@ export default function PatientAdmission() {
     return matchesStatus && matchesSearch;
   });
 
-  // CREATE - Add new patient
   const handleAddPatient = async (formData) => {
     try {
       const response = await API.post('/patients', {
@@ -59,26 +72,24 @@ export default function PatientAdmission() {
         status: "admitted"
       });
       
-      // Update context immediately
+      // ✅ Update context immediately
       setPatients([...patients, response.data]);
       
       ActivityLogger.patientAdded(formData.name);
 
-      // Update bed status if assigned
       if (formData.bedId) {
         try {
-          const bedsResponse = await API.get('/beds');
-          const bed = bedsResponse.data.find(b => b.bedId === formData.bedId);
+          const bed = beds.find(b => b.bedId === formData.bedId);
           
           if (bed) {
-            await API.patch(`/beds/${bed._id}/status`, {
+            const bedResponse = await API.patch(`/beds/${bed._id}/status`, {
               status: "occupied",
               patient: formData.name,
               assignedDate: new Date().toISOString()
             });
 
-            // Refresh beds in context
-            fetchBeds();
+            // ✅ Update beds context immediately
+            setBeds(beds.map(b => b._id === bed._id ? bedResponse.data : b));
 
             await API.post('/notifications', {
               type: 'patient',
@@ -101,7 +112,6 @@ export default function PatientAdmission() {
 
       setShowAddModal(false);
       setError(null);
-      fetchAvailableBeds();
     } catch (err) {
       setError('Failed to add patient');
       console.error('Error adding patient:', err);
@@ -109,13 +119,12 @@ export default function PatientAdmission() {
     }
   };
 
-  // UPDATE - Edit patient details
   const handleUpdatePatient = async (patientId, formData) => {
     try {
       const oldPatient = patients.find(p => p._id === patientId);
       const response = await API.put(`/patients/${patientId}`, formData);
       
-      // Update context immediately
+      // ✅ Update context immediately
       setPatients(patients.map(p => p._id === patientId ? response.data : p));
 
       ActivityLogger.patientUpdated(formData.name);
@@ -124,14 +133,16 @@ export default function PatientAdmission() {
       if (oldPatient.bedId !== formData.bedId) {
         if (oldPatient.bedId) {
           try {
-            const bedsResponse = await API.get('/beds');
-            const oldBed = bedsResponse.data.find(b => b.bedId === oldPatient.bedId);
+            const oldBed = beds.find(b => b.bedId === oldPatient.bedId);
             if (oldBed) {
-              await API.patch(`/beds/${oldBed._id}/status`, {
+              const oldBedResponse = await API.patch(`/beds/${oldBed._id}/status`, {
                 status: "available",
                 patient: null,
                 assignedDate: null
               });
+              
+              // ✅ Update beds context immediately
+              setBeds(beds.map(b => b._id === oldBed._id ? oldBedResponse.data : b));
             }
           } catch (err) {
             console.error('Error freeing old bed:', err);
@@ -140,23 +151,21 @@ export default function PatientAdmission() {
 
         if (formData.bedId) {
           try {
-            const bedsResponse = await API.get('/beds');
-            const newBed = bedsResponse.data.find(b => b.bedId === formData.bedId);
+            const newBed = beds.find(b => b.bedId === formData.bedId);
             if (newBed) {
-              await API.patch(`/beds/${newBed._id}/status`, {
+              const newBedResponse = await API.patch(`/beds/${newBed._id}/status`, {
                 status: "occupied",
                 patient: formData.name,
                 assignedDate: new Date().toISOString()
               });
+              
+              // ✅ Update beds context immediately
+              setBeds(beds.map(b => b._id === newBed._id ? newBedResponse.data : b));
             }
           } catch (err) {
             console.error('Error occupying new bed:', err);
           }
         }
-
-        // Refresh beds in context
-        fetchBeds();
-        fetchAvailableBeds();
       }
 
       setShowEditModal(false);
@@ -169,7 +178,6 @@ export default function PatientAdmission() {
     }
   };
 
-  // CREATE TRANSFER REQUEST
   const handleCreateTransferRequest = async (formData) => {
     try {
       const transferData = {
@@ -214,7 +222,6 @@ export default function PatientAdmission() {
     }
   };
 
-  // DELETE - Discharge patient
   const handleDischarge = async (patientId) => {
     const patient = patients.find(p => p._id === patientId);
     
@@ -225,26 +232,24 @@ export default function PatientAdmission() {
     try {
       await API.delete(`/patients/${patientId}`);
       
-      // Update context immediately
+      // ✅ Update context immediately
       setPatients(patients.filter(p => p._id !== patientId));
 
       ActivityLogger.patientDischarged(patient.name);
 
-      // Free up bed if assigned
       if (patient.bedId) {
         try {
-          const bedsResponse = await API.get('/beds');
-          const bed = bedsResponse.data.find(b => b.bedId === patient.bedId);
+          const bed = beds.find(b => b.bedId === patient.bedId);
           
           if (bed) {
-            await API.patch(`/beds/${bed._id}/status`, {
+            const bedResponse = await API.patch(`/beds/${bed._id}/status`, {
               status: "available",
               patient: null,
               assignedDate: null
             });
 
-            // Refresh beds in context
-            fetchBeds();
+            // ✅ Update beds context immediately
+            setBeds(beds.map(b => b._id === bed._id ? bedResponse.data : b));
 
             await API.post('/notifications', {
               type: 'patient',
@@ -267,7 +272,6 @@ export default function PatientAdmission() {
 
       setSelectedPatient(null);
       setError(null);
-      fetchAvailableBeds();
     } catch (err) {
       setError('Failed to discharge patient');
       console.error('Error discharging patient:', err);
@@ -344,20 +348,22 @@ export default function PatientAdmission() {
             <option value="discharged">Discharged</option>
           </select>
         </div>
-        <div className="view-toggle">
-          <button 
-            className={`view-btn ${viewMode === "list" ? "active" : ""}`}
-            onClick={() => setViewMode("list")}
-          >
-            ☰ List
-          </button>
-          <button 
-            className={`view-btn ${viewMode === "grid" ? "active" : ""}`}
-            onClick={() => setViewMode("grid")}
-          >
-            ⊞ Grid
-          </button>
-        </div>
+        {!isMobile && (
+          <div className="view-toggle">
+            <button 
+              className={`view-btn ${viewMode === "list" ? "active" : ""}`}
+              onClick={() => setViewMode("list")}
+            >
+              ☰ List
+            </button>
+            <button 
+              className={`view-btn ${viewMode === "grid" ? "active" : ""}`}
+              onClick={() => setViewMode("grid")}
+            >
+              ⊞ Grid
+            </button>
+          </div>
+        )}
       </div>
 
       <div className={`patients-container ${viewMode}`}>

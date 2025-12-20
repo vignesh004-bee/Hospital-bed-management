@@ -1,6 +1,7 @@
-// src/components/TransferRequests.jsx
+// src/components/TransferRequests.jsx - WITH REAL-TIME UPDATES
 import React, { useState, useEffect } from "react";
 import API from "../api/api";
+import { useData } from "../context/DataContext";
 import { ActivityLogger } from "../utils/activityTracker";
 import "../styles/TransferRequests.css";
 
@@ -11,6 +12,9 @@ export default function TransferRequests() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // ✅ Use shared context for real-time patient updates
+  const { patients, setPatients, beds, setBeds } = useData();
 
   useEffect(() => {
     fetchTransferRequests();
@@ -54,7 +58,10 @@ export default function TransferRequests() {
       const response = await API.patch(`/transfers/${requestId}/approve`, {
         approvedBy: "Admin"
       });
+      
+      // ✅ Update requests immediately
       setRequests(requests.map(r => r._id === requestId ? response.data : r));
+      
       ActivityLogger.transferApproved(request.patientName);
       setError(null);
       alert('Transfer request approved successfully!');
@@ -73,7 +80,10 @@ export default function TransferRequests() {
     try {
       const request = requests.find(r => r._id === requestId);
       const response = await API.patch(`/transfers/${requestId}/reject`);
+      
+      // ✅ Update requests immediately
       setRequests(requests.map(r => r._id === requestId ? response.data : r));
+      
       ActivityLogger.transferRejected(request.patientName);
       setError(null);
       alert('Transfer request rejected.');
@@ -87,7 +97,10 @@ export default function TransferRequests() {
   const handleStartTransfer = async (requestId) => {
     try {
       const response = await API.patch(`/transfers/${requestId}/start`);
+      
+      // ✅ Update requests immediately
       setRequests(requests.map(r => r._id === requestId ? response.data : r));
+      
       setError(null);
     } catch (err) {
       setError('Failed to start transfer');
@@ -100,10 +113,55 @@ export default function TransferRequests() {
     try {
       const request = requests.find(r => r._id === requestId);
       const response = await API.patch(`/transfers/${requestId}/complete`);
+      
+      // ✅ Update requests immediately
       setRequests(requests.map(r => r._id === requestId ? response.data : r));
+      
       ActivityLogger.transferCompleted(request.patientName);
+
+      // ✅ Update patient in context with new ward/bed info
+      try {
+        const patientResponse = await API.get(`/patients`);
+        const updatedPatient = patientResponse.data.find(p => p.patientId === request.patientIdNumber);
+        
+        if (updatedPatient) {
+          setPatients(patients.map(p => 
+            p.patientId === request.patientIdNumber ? updatedPatient : p
+          ));
+        }
+      } catch (patientErr) {
+        console.error('Error fetching updated patient:', patientErr);
+      }
+
+      // ✅ Update beds in context
+      try {
+        // Free old bed
+        const oldBed = beds.find(b => b.bedId === request.fromBed);
+        if (oldBed) {
+          const oldBedResponse = await API.patch(`/beds/${oldBed._id}/status`, {
+            status: "available",
+            patient: null,
+            assignedDate: null
+          });
+          setBeds(beds.map(b => b._id === oldBed._id ? oldBedResponse.data : b));
+        }
+
+        // Occupy new bed
+        const newBed = beds.find(b => b.bedId === request.toBed);
+        if (newBed) {
+          const newBedResponse = await API.patch(`/beds/${newBed._id}/status`, {
+            status: "occupied",
+            patient: request.patientName,
+            assignedDate: new Date().toISOString()
+          });
+          setBeds(beds.map(b => b._id === newBed._id ? newBedResponse.data : b));
+        }
+      } catch (bedErr) {
+        console.error('Error updating beds:', bedErr);
+      }
+
       setError(null);
-      alert('Transfer completed! Patient record has been updated.');
+      alert('Transfer completed! Patient and bed records have been updated.');
     } catch (err) {
       setError('Failed to complete transfer');
       console.error('Error completing transfer:', err);
@@ -118,7 +176,10 @@ export default function TransferRequests() {
     
     try {
       await API.delete(`/transfers/${requestId}`);
+      
+      // ✅ Update requests immediately
       setRequests(requests.filter(r => r._id !== requestId));
+      
       setError(null);
     } catch (err) {
       setError('Failed to delete transfer');

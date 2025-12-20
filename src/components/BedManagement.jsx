@@ -1,44 +1,41 @@
-// src/components/BedManagement.jsx
+// src/components/BedManagement.jsx - WITH REAL-TIME UPDATES
 import React, { useState, useEffect } from "react";
-import API from "../api/api"; // ✅ Use centralized API
+import API from "../api/api";
+import { useData } from "../context/DataContext"; // ✅ Use context
 import { ActivityLogger } from "../utils/activityTracker";
 import "../styles/BedManagement.css";
 
 export default function BedManagement() {
-  const [beds, setBeds] = useState([]);
-  const [viewMode, setViewMode] = useState("grid");
+  const [viewMode, setViewMode] = useState("list");
   const [filterWard, setFilterWard] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedBed, setSelectedBed] = useState(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showAddBedModal, setShowAddBedModal] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // ✅ Use shared context for real-time updates
+  const { beds, setBeds, patients, setPatients, fetchBeds, fetchPatients, loading } = useData();
 
   const wards = ["all", "ICU", "General", "Emergency", "Pediatric", "Surgery"];
 
   useEffect(() => {
-    fetchBeds();
-    checkOccupancy();
     // Check occupancy every 2 minutes
     const interval = setInterval(checkOccupancy, 120000);
-    return () => clearInterval(interval);
+    
+    // Check if mobile
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('resize', checkMobile);
+    };
   }, []);
-
-  const fetchBeds = async () => {
-    try {
-      setLoading(true);
-      const response = await API.get('/beds');
-      setBeds(response.data || []);
-      setError(null);
-    } catch (err) {
-      setError('Failed to fetch beds');
-      console.error('Error fetching beds:', err);
-      setBeds([]);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const checkOccupancy = async () => {
     try {
@@ -52,7 +49,7 @@ export default function BedManagement() {
     try {
       const response = await API.post('/beds/initialize');
       alert(response.data.message);
-      fetchBeds();
+      fetchBeds(); // Refresh from context
     } catch (err) {
       console.error('Error initializing beds:', err);
       alert('Failed to initialize beds');
@@ -88,6 +85,8 @@ export default function BedManagement() {
       };
 
       const response = await API.patch(`/beds/${bedId}/status`, updateData);
+      
+      // ✅ Update context immediately
       setBeds(beds.map((b) => b._id === bedId ? response.data : b));
       
       // Log activity based on status change
@@ -133,17 +132,7 @@ export default function BedManagement() {
     try {
       const bed = beds.find(b => b._id === bedId);
       
-      // Update bed status
-      const updateData = {
-        status: "occupied",
-        patient: patientData.name,
-        assignedDate: new Date().toISOString()
-      };
-
-      const bedResponse = await API.patch(`/beds/${bedId}/status`, updateData);
-      setBeds(beds.map((b) => b._id === bedId ? bedResponse.data : b));
-
-      // Create patient record
+      // Create patient record FIRST
       const patientPayload = {
         ...patientData,
         bedId: bed.bedId,
@@ -152,7 +141,22 @@ export default function BedManagement() {
         status: "admitted"
       };
 
-      await API.post('/patients', patientPayload);
+      const patientResponse = await API.post('/patients', patientPayload);
+      
+      // ✅ Update patients context immediately
+      setPatients([...patients, patientResponse.data]);
+      
+      // Then update bed status
+      const updateData = {
+        status: "occupied",
+        patient: patientData.name,
+        assignedDate: new Date().toISOString()
+      };
+
+      const bedResponse = await API.patch(`/beds/${bedId}/status`, updateData);
+      
+      // ✅ Update beds context immediately
+      setBeds(beds.map((b) => b._id === bedId ? bedResponse.data : b));
 
       ActivityLogger.bedAssigned(bed.bedId, patientData.name);
 
@@ -187,7 +191,10 @@ export default function BedManagement() {
       };
 
       const response = await API.post('/beds', newBed);
+      
+      // ✅ Update context immediately
       setBeds([...beds, response.data]);
+      
       setShowAddBedModal(false);
       setError(null);
     } catch (err) {
@@ -204,7 +211,10 @@ export default function BedManagement() {
 
     try {
       await API.delete(`/beds/${bedId}`);
+      
+      // ✅ Update context immediately
       setBeds(beds.filter(b => b._id !== bedId));
+      
       setError(null);
     } catch (err) {
       setError('Failed to delete bed');
@@ -318,14 +328,16 @@ export default function BedManagement() {
             ))}
           </select>
         </div>
-        <div className="view-toggle">
-          <button className={`view-btn ${viewMode === "grid" ? "active" : ""}`} onClick={() => setViewMode("grid")}>
-            ⊞ Grid
-          </button>
-          <button className={`view-btn ${viewMode === "list" ? "active" : ""}`} onClick={() => setViewMode("list")}>
-            ☰ List
-          </button>
-        </div>
+        {!isMobile && (
+          <div className="view-toggle">
+            <button className={`view-btn ${viewMode === "grid" ? "active" : ""}`} onClick={() => setViewMode("grid")}>
+              ⊞ Grid
+            </button>
+            <button className={`view-btn ${viewMode === "list" ? "active" : ""}`} onClick={() => setViewMode("list")}>
+              ☰ List
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Beds Display */}
