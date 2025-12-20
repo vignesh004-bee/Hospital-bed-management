@@ -1,4 +1,4 @@
-// src/components/Dashboard.jsx - Fully Responsive with Hamburger Menu
+// src/components/Dashboard.jsx - Live Patient Journey Tracker
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -19,10 +19,20 @@ export default function Dashboard() {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false); // Hamburger state
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [filterType, setFilterType] = useState("all"); // all, general, emergency, icu
   
   // Get shared data from context
   const { beds, patients, staff, transfers, loading, fetchAllData } = useData();
+
+  // Update current time every second for live tracking
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Auto-refresh every 30 seconds
   useEffect(() => {
@@ -96,7 +106,7 @@ export default function Dashboard() {
     setActiveMenu(menu);
     setSearchTerm("");
     setSearchResults(null);
-    setSidebarOpen(false); // Close sidebar on menu click
+    setSidebarOpen(false);
   };
 
   const handleViewDetails = () => {
@@ -118,30 +128,64 @@ export default function Dashboard() {
     avgStayDays: 3.5
   };
 
-  // Calculate time remaining
-  const calculateTimeRemaining = (estimatedCompletion) => {
-    const now = new Date();
-    const completion = new Date(estimatedCompletion);
-    const diffMs = completion - now;
-    
-    if (diffMs <= 0) return "Completed";
-    
-    const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    
-    if (diffHrs > 24) {
-      const days = Math.floor(diffHrs / 24);
-      return `${days}d ${diffHrs % 24}h remaining`;
+  // Get patient type duration based on ward
+  const getPatientTypeDuration = (ward) => {
+    const wardLower = (ward || '').toLowerCase();
+    if (wardLower.includes('icu') || wardLower.includes('intensive')) {
+      return { days: 10, type: 'ICU', icon: '🏥', color: '#000000' };
+    } else if (wardLower.includes('emergency') || wardLower.includes('er')) {
+      return { days: 4, type: 'Emergency', icon: '🚨', color: '#000000' };
+    } else {
+      return { days: 1, type: 'General', icon: '🏨', color: '#000000' };
     }
-    return `${diffHrs}h ${diffMins}m remaining`;
+  };
+
+  // Format time remaining
+  const formatTimeRemaining = (milliseconds) => {
+    if (milliseconds <= 0) return "Ready for discharge";
+    
+    const totalMinutes = Math.floor(milliseconds / (1000 * 60));
+    const totalHours = Math.floor(milliseconds / (1000 * 60 * 60));
+    const days = Math.floor(totalHours / 24);
+    const hours = totalHours % 24;
+    const minutes = totalMinutes % 60;
+    
+    if (days > 0) {
+      return `${days}d ${hours}h ${minutes}m remaining`;
+    } else if (hours > 0) {
+      return `${hours}h ${minutes}m remaining`;
+    } else {
+      return `${minutes}m remaining`;
+    }
+  };
+
+  // Format elapsed time
+  const formatElapsedTime = (milliseconds) => {
+    const totalMinutes = Math.floor(milliseconds / (1000 * 60));
+    const totalHours = Math.floor(milliseconds / (1000 * 60 * 60));
+    const days = Math.floor(totalHours / 24);
+    const hours = totalHours % 24;
+    const minutes = totalMinutes % 60;
+    
+    if (days > 0) {
+      return `${days}d ${hours}h ${minutes}m`;
+    } else if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    } else {
+      return `${minutes}m`;
+    }
   };
 
   const getStageIcon = (stage) => {
     switch(stage) {
       case "Admission": return "📋";
+      case "Assessment": return "🔍";
       case "Tests": return "🔬";
-      case "Surgery": return "🏥";
-      case "Recovery": return "💊";
+      case "Treatment": return "💊";
+      case "Surgery": return "⚕️";
+      case "ICU Care": return "🏥";
+      case "Recovery": return "🛏️";
+      case "Monitoring": return "📊";
       case "Discharge": return "✅";
       default: return "📍";
     }
@@ -151,61 +195,97 @@ export default function Dashboard() {
     switch(status) {
       case "completed": return "#000000";
       case "in-progress": return "#666666";
-      case "pending": return "#cccccc";
-      default: return "#e5e5e5";
+      case "pending": return "#e0e0e0";
+      default: return "#e0e0e0";
     }
   };
 
-  // Transform real patients into journey format
+  // Transform real patients into journey format with live tracking
   const getActiveJourneys = () => {
     return patients
       .filter(p => p.status === "admitted")
       .map(patient => {
         const admissionDate = new Date(patient.admissionDate);
-        const now = new Date();
-        const daysSinceAdmission = Math.floor((now - admissionDate) / (1000 * 60 * 60 * 24));
         
+        // Calculate precise time since admission using currentTime
+        const timeSinceAdmission = currentTime - admissionDate;
+        const daysSinceAdmission = timeSinceAdmission / (1000 * 60 * 60 * 24);
+        
+        // Get patient type and expected duration
+        const patientType = getPatientTypeDuration(patient.ward);
+        const expectedDurationDays = patientType.days;
+        
+        // Calculate stages based on patient type
+        let stages = [];
         let currentStage = "Admission";
-        let progress = 10;
-        const stages = [
-          { name: "Admission", status: "completed", duration: "45m" },
-          { name: "Tests", status: "pending", duration: "" },
-          { name: "Surgery", status: "pending", duration: "" },
-          { name: "Recovery", status: "pending", duration: "" },
-          { name: "Discharge", status: "pending", duration: "" }
-        ];
+        let currentStageIndex = 0;
+        
+        // Different timelines for different patient types
+        if (patientType.type === 'General') {
+          // General: 1 day (24 hours)
+          stages = [
+            { name: "Admission", checkpoint: 0, duration: "30m" },
+            { name: "Assessment", checkpoint: 0.04, duration: "1h" }, // 1 hour
+            { name: "Treatment", checkpoint: 0.21, duration: "8h" }, // 5 hours
+            { name: "Monitoring", checkpoint: 0.63, duration: "6h" }, // 15 hours
+            { name: "Discharge", checkpoint: 0.96, duration: "1h" } // 23 hours
+          ];
+        } else if (patientType.type === 'Emergency') {
+          // Emergency: 4 days (96 hours)
+          stages = [
+            { name: "Admission", checkpoint: 0, duration: "1h" },
+            { name: "Assessment", checkpoint: 0.02, duration: "3h" }, // 2 hours
+            { name: "Tests", checkpoint: 0.13, duration: "12h" }, // 12 hours
+            { name: "Treatment", checkpoint: 0.38, duration: "24h" }, // 36 hours
+            { name: "Recovery", checkpoint: 0.75, duration: "36h" }, // 72 hours
+            { name: "Discharge", checkpoint: 0.96, duration: "4h" } // 92 hours
+          ];
+        } else {
+          // ICU: 10 days (240 hours)
+          stages = [
+            { name: "Admission", checkpoint: 0, duration: "2h" },
+            { name: "Assessment", checkpoint: 0.02, duration: "6h" }, // 4 hours
+            { name: "ICU Care", checkpoint: 0.08, duration: "72h" }, // 20 hours
+            { name: "Surgery", checkpoint: 0.38, duration: "48h" }, // 92 hours
+            { name: "Recovery", checkpoint: 0.58, duration: "72h" }, // 140 hours
+            { name: "Monitoring", checkpoint: 0.83, duration: "36h" }, // 200 hours
+            { name: "Discharge", checkpoint: 0.96, duration: "8h" } // 230 hours
+          ];
+        }
+        
+        // Calculate progress as percentage of expected duration
+        const progressPercent = Math.min((daysSinceAdmission / expectedDurationDays) * 100, 100);
+        
+        // Determine current stage based on progress
+        for (let i = 0; i < stages.length; i++) {
+          const checkpointPercent = (stages[i].checkpoint / expectedDurationDays) * 100;
+          if (progressPercent >= checkpointPercent * 100) {
+            currentStageIndex = i;
+            currentStage = stages[i].name;
+          }
+        }
+        
+        // Update stage statuses
+        stages = stages.map((stage, index) => {
+          if (index < currentStageIndex) {
+            return { ...stage, status: "completed" };
+          } else if (index === currentStageIndex) {
+            return { ...stage, status: "in-progress" };
+          } else {
+            return { ...stage, status: "pending" };
+          }
+        });
 
-        if (daysSinceAdmission >= 0) {
-          stages[0].status = "completed";
-          progress = 20;
-        }
-        if (daysSinceAdmission >= 1) {
-          stages[1].status = "in-progress";
-          stages[1].duration = "2h 15m";
-          currentStage = "Tests";
-          progress = 40;
-        }
-        if (daysSinceAdmission >= 2) {
-          stages[1].status = "completed";
-          stages[2].status = "in-progress";
-          stages[2].duration = "3h 30m";
-          currentStage = "Surgery";
-          progress = 60;
-        }
-        if (daysSinceAdmission >= 3) {
-          stages[2].status = "completed";
-          stages[3].status = "in-progress";
-          stages[3].duration = "1d 2h";
-          currentStage = "Recovery";
-          progress = 85;
-        }
-        if (daysSinceAdmission >= 4) {
-          stages[3].status = "completed";
-          stages[4].status = "in-progress";
-          currentStage = "Discharge";
-          progress = 95;
-        }
+        // Calculate estimated discharge time
+        const estimatedDischarge = new Date(admissionDate);
+        estimatedDischarge.setDate(estimatedDischarge.getDate() + expectedDurationDays);
+        const timeUntilDischarge = estimatedDischarge - currentTime;
+        
+        // Check if delayed
+        const isDelayed = daysSinceAdmission > expectedDurationDays;
+        const delayHours = isDelayed ? (daysSinceAdmission - expectedDurationDays) * 24 : 0;
 
+        // Assign staff
         const assignedStaff = {};
         const wardStaff = staff.filter(s => 
           s.department === patient.ward && s.currentStatus === "on-duty"
@@ -216,29 +296,71 @@ export default function Dashboard() {
           assignedStaff[currentStage] = randomStaff.name;
         }
 
-        const estimatedCompletion = new Date(admissionDate);
-        estimatedCompletion.setDate(estimatedCompletion.getDate() + 5);
+        // Generate alerts
+        const alerts = [];
+        if (isDelayed) {
+          alerts.push({
+            type: 'warning',
+            message: `Patient stay delayed by ${Math.floor(delayHours)} hours`
+          });
+        }
+        if (progressPercent > 90 && progressPercent < 100) {
+          alerts.push({
+            type: 'info',
+            message: 'Prepare discharge documentation'
+          });
+        }
+        if (timeUntilDischarge < 3600000 && timeUntilDischarge > 0) {
+          alerts.push({
+            type: 'success',
+            message: 'Discharge within 1 hour'
+          });
+        }
 
         return {
           id: patient.patientId,
           name: patient.name,
+          patientType: patientType.type,
+          patientTypeIcon: patientType.icon,
+          patientTypeColor: patientType.color,
           currentStage,
-          progress,
+          progress: Math.round(progressPercent),
           stages,
           assignedStaff,
-          estimatedCompletion: estimatedCompletion.toISOString(),
-          isDelayed: daysSinceAdmission > 5,
-          delayReason: daysSinceAdmission > 5 ? "Extended recovery period" : null,
-          alerts: daysSinceAdmission > 5 ? [{
-            type: 'warning',
-            message: 'Patient stay exceeds expected duration'
-          }] : [],
-          notes: `${patient.diagnosis} - Ward: ${patient.ward || 'Not assigned'}`
+          admissionDate: admissionDate.toISOString(),
+          estimatedDischarge: estimatedDischarge.toISOString(),
+          timeElapsed: formatElapsedTime(timeSinceAdmission),
+          timeRemaining: formatTimeRemaining(timeUntilDischarge),
+          isDelayed,
+          delayReason: isDelayed ? `Extended ${patientType.type.toLowerCase()} care - ${Math.floor(delayHours)}h over expected` : null,
+          alerts,
+          notes: `${patient.diagnosis} - ${patient.ward || 'Not assigned'}`,
+          expectedDuration: `${expectedDurationDays} day${expectedDurationDays > 1 ? 's' : ''}`
         };
+      })
+      .sort((a, b) => {
+        // Sort by progress (most urgent first)
+        if (a.isDelayed && !b.isDelayed) return -1;
+        if (!a.isDelayed && b.isDelayed) return 1;
+        return b.progress - a.progress;
       });
   };
 
   const activeJourneys = getActiveJourneys();
+  
+  // Filter journeys by type
+  const filteredJourneys = filterType === "all" 
+    ? activeJourneys 
+    : activeJourneys.filter(j => j.patientType.toLowerCase() === filterType);
+
+  // Calculate type-specific analytics
+  const typeAnalytics = {
+    general: activeJourneys.filter(j => j.patientType === 'General').length,
+    emergency: activeJourneys.filter(j => j.patientType === 'Emergency').length,
+    icu: activeJourneys.filter(j => j.patientType === 'ICU').length,
+    delayed: activeJourneys.filter(j => j.isDelayed).length,
+    nearDischarge: activeJourneys.filter(j => j.progress > 90).length
+  };
 
   const stats = [
     { value: analytics.totalBeds, label: "Total Beds" },
@@ -248,10 +370,10 @@ export default function Dashboard() {
   ];
 
   const metrics = [
-    { value: `${analytics.avgStayDays} days`, label: "Avg Stay Duration", icon: "⏱️" },
-    { value: "94%", label: "Patient Satisfaction", icon: "😊" },
-    { value: analytics.admittedPatients, label: "Active Cases", icon: "📋" },
-    { value: analytics.totalPatients, label: "Total Patients", icon: "👥" }
+    { value: typeAnalytics.general, label: "General Ward", icon: "🏨", color: "#000000" },
+    { value: typeAnalytics.emergency, label: "Emergency", icon: "🚨", color: "#000000" },
+    { value: typeAnalytics.icu, label: "ICU Patients", icon: "🏥", color: "#000000" },
+    { value: typeAnalytics.nearDischarge, label: "Near Discharge", icon: "✅", color: "#000000" }
   ];
 
   const getAlertMessage = () => {
@@ -323,9 +445,9 @@ export default function Dashboard() {
             </div>
 
             <div className="page-header">
-              <h1 className="page-title">Dashboard Overview</h1>
+              <h1 className="page-title">Live Patient Journey Tracker</h1>
               <div className="breadcrumb">
-                Home / Dashboard / Real-Time Monitoring
+                Home / Dashboard / Live Tracking - {currentTime.toLocaleTimeString()}
               </div>
             </div>
 
@@ -338,19 +460,57 @@ export default function Dashboard() {
               ))}
             </div>
 
+            {/* Type-specific metrics */}
+            <div className="metrics-grid">
+              {metrics.map((metric, index) => (
+                <div 
+                  key={index} 
+                  className="metric-card"
+                  style={{ borderLeft: `4px solid ${metric.color}` }}
+                >
+                  <div className="metric-icon">{metric.icon}</div>
+                  <div className="metric-value">{metric.value}</div>
+                  <div className="metric-label">{metric.label}</div>
+                </div>
+              ))}
+            </div>
+
             <div className="card">
               <div className="card-header">
                 <div className="card-header-left">
-                  <div className="icon-box">📊</div>
+                  <div className="icon-box">🔴</div>
                   <div>
                     <h2 className="card-title">Real-Time Patient Journey Tracker</h2>
                     <p className="card-subtitle">
-                      Visual timeline of patient progress from admission to discharge with live updates
+                      Live tracking: General (1 day) • Emergency (4 days) • ICU (10 days)
                     </p>
                   </div>
                 </div>
                 <div className="card-header-right">
-                  <button className="tab-btn">Active Journeys ({analytics.admittedPatients})</button>
+                  <button 
+                    className={`tab-btn ${filterType === 'all' ? 'tab-btn-active' : ''}`}
+                    onClick={() => setFilterType('all')}
+                  >
+                    All ({analytics.admittedPatients})
+                  </button>
+                  <button 
+                    className={`tab-btn ${filterType === 'general' ? 'tab-btn-active' : ''}`}
+                    onClick={() => setFilterType('general')}
+                  >
+                    🏨 General ({typeAnalytics.general})
+                  </button>
+                  <button 
+                    className={`tab-btn ${filterType === 'emergency' ? 'tab-btn-active' : ''}`}
+                    onClick={() => setFilterType('emergency')}
+                  >
+                    🚨 Emergency ({typeAnalytics.emergency})
+                  </button>
+                  <button 
+                    className={`tab-btn ${filterType === 'icu' ? 'tab-btn-active' : ''}`}
+                    onClick={() => setFilterType('icu')}
+                  >
+                    🏥 ICU ({typeAnalytics.icu})
+                  </button>
                   <button 
                     className={`tab-btn ${autoRefresh ? 'tab-btn-active' : ''}`}
                     onClick={() => setAutoRefresh(!autoRefresh)}
@@ -361,21 +521,37 @@ export default function Dashboard() {
               </div>
 
               <div className="patients-grid">
-                {activeJourneys.length === 0 ? (
+                {filteredJourneys.length === 0 ? (
                   <div className="no-journeys">
                     <div className="no-journeys-icon">📋</div>
-                    <div className="no-journeys-text">No active patient journeys</div>
-                    <div className="no-journeys-subtext">Admitted patients will appear here with their treatment progress</div>
+                    <div className="no-journeys-text">
+                      {filterType === 'all' 
+                        ? 'No active patient journeys' 
+                        : `No ${filterType} patients currently`}
+                    </div>
+                    <div className="no-journeys-subtext">
+                      Admitted patients will appear here with their live treatment progress
+                    </div>
                   </div>
                 ) : (
-                  activeJourneys.map((journey) => (
-                    <div key={journey.id} className={`patient-card ${journey.isDelayed ? 'delayed' : ''}`}>
+                  filteredJourneys.map((journey) => (
+                    <div 
+                      key={journey.id} 
+                      className={`patient-card ${journey.isDelayed ? 'delayed' : ''}`}
+                      style={{ borderLeft: `4px solid ${journey.patientTypeColor}` }}
+                    >
                       <div className="patient-header">
                         <div>
                           <div className="patient-id">{journey.id}</div>
                           <div className="patient-name">{journey.name}</div>
                         </div>
                         <div className="header-badges">
+                          <span 
+                            className="type-badge" 
+                            style={{ background: journey.patientTypeColor, color: 'white' }}
+                          >
+                            {journey.patientTypeIcon} {journey.patientType}
+                          </span>
                           {journey.isDelayed && (
                             <span className="delay-badge" title={journey.delayReason}>
                               ⚠️ DELAYED
@@ -392,6 +568,17 @@ export default function Dashboard() {
                         <strong>{getStageIcon(journey.currentStage)} {journey.currentStage}</strong>
                       </div>
 
+                      <div className="time-info">
+                        <div className="time-item">
+                          <span className="time-label">⏱️ Elapsed:</span>
+                          <span className="time-value">{journey.timeElapsed}</span>
+                        </div>
+                        <div className="time-item">
+                          <span className="time-label">⏳ Remaining:</span>
+                          <span className="time-value">{journey.timeRemaining}</span>
+                        </div>
+                      </div>
+
                       {journey.assignedStaff && journey.assignedStaff[journey.currentStage] && (
                         <div className="assigned-staff">
                           <span className="staff-icon">👨‍⚕️</span>
@@ -403,8 +590,8 @@ export default function Dashboard() {
                         {journey.stages.map((stage, index) => (
                           <div 
                             key={index} 
-                            className={`stage-item ${stage.status} ${stage.isDelayed ? 'stage-delayed' : ''}`}
-                            title={`${stage.name}: ${stage.status}${stage.assignedStaff ? ` - ${stage.assignedStaff}` : ''}`}
+                            className={`stage-item ${stage.status}`}
+                            title={`${stage.name}: ${stage.status}${stage.duration ? ` - ${stage.duration}` : ''}`}
                           >
                             <div 
                               className="stage-dot"
@@ -413,19 +600,16 @@ export default function Dashboard() {
                               {stage.status === 'in-progress' && (
                                 <span className="pulse-ring"></span>
                               )}
-                              {stage.isDelayed && (
-                                <span className="delay-indicator">⚠️</span>
-                              )}
                             </div>
                             <div className="stage-label">{getStageIcon(stage.name)}</div>
-                            {stage.duration && (
+                            {stage.duration && stage.status !== 'pending' && (
                               <div className="stage-duration-small">{stage.duration}</div>
                             )}
                             {index < journey.stages.length - 1 && (
                               <div 
                                 className="stage-line"
                                 style={{ 
-                                  background: stage.status === 'completed' ? '#000000' : '#e5e5e5'
+                                  background: stage.status === 'completed' ? '#000000' : '#e0e0e0'
                                 }}
                               ></div>
                             )}
@@ -436,18 +620,23 @@ export default function Dashboard() {
                       <div className="progress-bar">
                         <div 
                           className={`progress-fill ${journey.isDelayed ? 'delayed-progress' : ''}`}
-                          style={{ width: `${journey.progress}%` }}
+                          style={{ 
+                            width: `${journey.progress}%`,
+                            background: journey.isDelayed 
+                              ? '#666666' 
+                              : '#000000'
+                          }}
                         />
                       </div>
                       
                       <div className="patient-footer">
                         <span>{journey.progress}% Complete</span>
-                        <span>{calculateTimeRemaining(journey.estimatedCompletion)}</span>
+                        <span>Expected: {journey.expectedDuration}</span>
                       </div>
 
                       {journey.alerts && journey.alerts.length > 0 && (
                         <div className="journey-alerts">
-                          {journey.alerts.slice(0, 2).map((alert, idx) => (
+                          {journey.alerts.map((alert, idx) => (
                             <div key={idx} className={`alert-item alert-${alert.type}`}>
                               {alert.type === 'warning' && '⚠️'}
                               {alert.type === 'info' && 'ℹ️'}
@@ -470,15 +659,20 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="metrics-grid">
-              {metrics.map((metric, index) => (
-                <div key={index} className="metric-card">
-                  <div className="metric-icon">{metric.icon}</div>
-                  <div className="metric-value">{metric.value}</div>
-                  <div className="metric-label">{metric.label}</div>
+            {/* Summary Statistics */}
+            {typeAnalytics.delayed > 0 && (
+              <div className="card">
+                <div className="card-header">
+                  <div className="card-header-left">
+                    <div className="icon-box">⚠️</div>
+                    <div>
+                      <h2 className="card-title">Attention Required</h2>
+                      <p className="card-subtitle">{typeAnalytics.delayed} patient(s) exceeding expected duration</p>
+                    </div>
+                  </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
           </>
         );
     }
@@ -572,7 +766,6 @@ export default function Dashboard() {
 
       <main className="main-content">
         <header className="dashboard-header">
-          {/* Hamburger Menu Button */}
           <button 
             className="hamburger-btn" 
             onClick={(e) => {
