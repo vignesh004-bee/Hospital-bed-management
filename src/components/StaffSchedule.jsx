@@ -1,6 +1,6 @@
 // src/components/StaffSchedule.jsx
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import API from "../api/api";
 import { ActivityLogger } from "../utils/activityTracker";
 import "../styles/StaffSchedule.css";
 
@@ -19,7 +19,6 @@ export default function StaffSchedule() {
   const departments = ["all", "Surgery", "Emergency", "ICU", "Pediatrics", "General", "Radiology"];
   const shifts = ["Day Shift", "Night Shift"];
 
-  // Fetch staff from MongoDB
   useEffect(() => {
     fetchStaff();
   }, []);
@@ -27,11 +26,11 @@ export default function StaffSchedule() {
   const fetchStaff = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://localhost:5001/api/staff');
+      const response = await API.get('/staff');
       setStaff(response.data || []);
       setError(null);
     } catch (err) {
-      setError('Failed to fetch staff. Make sure the backend is running.');
+      setError('Failed to fetch staff');
       console.error('Error fetching staff:', err);
       setStaff([]);
     } finally {
@@ -55,18 +54,14 @@ export default function StaffSchedule() {
     return matchesDept && matchesSearch;
   });
 
-  // CREATE - Add new staff
   const handleAddStaff = async (formData) => {
     try {
-      const response = await axios.post('http://localhost:5001/api/staff', {
+      const response = await API.post('/staff', {
         ...formData,
         currentStatus: "off-duty"
       });
       setStaff([...staff, response.data]);
-      
-      // Log activity AFTER successful operation
       ActivityLogger.staffAdded(formData.name);
-      
       setShowAddModal(false);
       setError(null);
     } catch (err) {
@@ -76,25 +71,19 @@ export default function StaffSchedule() {
     }
   };
 
-  // UPDATE - Assign weekly schedule
   const handleAssignSchedule = async (staffId, scheduleData) => {
     try {
-      const response = await axios.patch(`http://localhost:5001/api/staff/${staffId}/schedule`, scheduleData);
+      const response = await API.patch(`/staff/${staffId}/schedule`, scheduleData);
       setStaff(staff.map(s => s._id === staffId ? response.data : s));
-      
-      // Get staff member for activity logging
       const staffMember = staff.find(s => s._id === staffId);
-      
-      // Log activity AFTER successful operation
       ActivityLogger.staffScheduled(staffMember.name);
       
-      // Create notification for schedule assignment
       const weekStart = new Date(scheduleData.startDate).toLocaleDateString();
       const weekEnd = new Date(scheduleData.startDate);
       weekEnd.setDate(weekEnd.getDate() + 6);
       
       try {
-        await axios.post('http://localhost:5001/api/notifications', {
+        await API.post('/notifications', {
           type: 'staff',
           title: 'Staff Schedule Assigned',
           message: `${staffMember.name} (${staffMember.staffId}) has been assigned to ${scheduleData.shift} for the week of ${weekStart} - ${weekEnd.toLocaleDateString()}. Department: ${staffMember.department}`,
@@ -115,22 +104,18 @@ export default function StaffSchedule() {
     }
   };
 
-  // UPDATE - Change status
   const handleStatusChange = async (staffId, newStatus) => {
     try {
       const staffMember = staff.find(s => s._id === staffId);
-      const response = await axios.patch(`http://localhost:5001/api/staff/${staffId}/status`, {
+      const response = await API.patch(`/staff/${staffId}/status`, {
         currentStatus: newStatus
       });
       setStaff(staff.map(s => s._id === staffId ? response.data : s));
-      
-      // Log activity AFTER successful operation
       ActivityLogger.staffStatusChanged(staffMember.name, newStatus);
       
-      // Create notification for status change
       if (newStatus === "on-duty") {
         try {
-          await axios.post('http://localhost:5001/api/notifications', {
+          await API.post('/notifications', {
             type: 'staff',
             title: 'Staff On Duty',
             message: `${staffMember.name} (${staffMember.role}) from ${staffMember.department} is now on duty${staffMember.currentShift ? ` - ${staffMember.currentShift}` : ''}`,
@@ -141,7 +126,7 @@ export default function StaffSchedule() {
         }
       } else if (newStatus === "off-duty") {
         try {
-          await axios.post('http://localhost:5001/api/notifications', {
+          await API.post('/notifications', {
             type: 'staff',
             title: 'Staff Off Duty',
             message: `${staffMember.name} (${staffMember.role}) from ${staffMember.department} has completed their shift and is now off duty`,
@@ -160,15 +145,11 @@ export default function StaffSchedule() {
     }
   };
 
-  // UPDATE - Edit staff
   const handleUpdateStaff = async (staffId, formData) => {
     try {
-      const response = await axios.put(`http://localhost:5001/api/staff/${staffId}`, formData);
+      const response = await API.put(`/staff/${staffId}`, formData);
       setStaff(staff.map(s => s._id === staffId ? response.data : s));
-      
-      // Log activity AFTER successful operation
       ActivityLogger.staffUpdated(formData.name);
-      
       setShowEditModal(false);
       setSelectedStaff(null);
       setError(null);
@@ -179,14 +160,13 @@ export default function StaffSchedule() {
     }
   };
 
-  // DELETE - Remove staff
   const handleDeleteStaff = async (staffId) => {
     if (!window.confirm('Are you sure you want to delete this staff member?')) {
       return;
     }
     
     try {
-      await axios.delete(`http://localhost:5001/api/staff/${staffId}`);
+      await API.delete(`/staff/${staffId}`);
       setStaff(staff.filter(s => s._id !== staffId));
       setError(null);
     } catch (err) {
@@ -259,7 +239,6 @@ export default function StaffSchedule() {
         </div>
       )}
 
-      {/* Stats */}
       <div className="staff-stats">
         <div className="stat-card">
           <div className="stat-icon">👥</div>
@@ -291,7 +270,6 @@ export default function StaffSchedule() {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="staff-filters">
         <div className="filter-left">
           <input
@@ -315,7 +293,6 @@ export default function StaffSchedule() {
         </div>
       </div>
 
-      {/* Staff Grid */}
       <div className="staff-grid">
         {filteredStaff.length === 0 ? (
           <div className="empty-state">
@@ -432,7 +409,7 @@ export default function StaffSchedule() {
         )}
       </div>
 
-      {/* Add Staff Modal */}
+      {/* Modals - Add/Edit/Schedule (keeping same as original) */}
       {showAddModal && (
         <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -457,12 +434,10 @@ export default function StaffSchedule() {
                   <label>Staff ID *</label>
                   <input type="text" name="staffId" placeholder="e.g., ST-001" required />
                 </div>
-
                 <div className="form-group">
                   <label>Full Name *</label>
                   <input type="text" name="name" required />
                 </div>
-
                 <div className="form-row">
                   <div className="form-group">
                     <label>Role *</label>
@@ -485,17 +460,14 @@ export default function StaffSchedule() {
                     </select>
                   </div>
                 </div>
-
                 <div className="form-group">
                   <label>Specialty *</label>
                   <input type="text" name="specialty" required />
                 </div>
-
                 <div className="form-group">
                   <label>Contact Number *</label>
                   <input type="tel" name="contact" required />
                 </div>
-
                 <div className="modal-footer">
                   <button type="button" className="btn-secondary" onClick={() => setShowAddModal(false)}>
                     Cancel
@@ -510,7 +482,6 @@ export default function StaffSchedule() {
         </div>
       )}
 
-      {/* Edit Staff Modal */}
       {showEditModal && selectedStaff && (
         <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -534,7 +505,6 @@ export default function StaffSchedule() {
                   <label>Full Name *</label>
                   <input type="text" name="name" defaultValue={selectedStaff.name} required />
                 </div>
-
                 <div className="form-row">
                   <div className="form-group">
                     <label>Role *</label>
@@ -555,17 +525,14 @@ export default function StaffSchedule() {
                     </select>
                   </div>
                 </div>
-
                 <div className="form-group">
                   <label>Specialty *</label>
                   <input type="text" name="specialty" defaultValue={selectedStaff.specialty} required />
                 </div>
-
                 <div className="form-group">
                   <label>Contact Number *</label>
                   <input type="tel" name="contact" defaultValue={selectedStaff.contact} required />
                 </div>
-
                 <div className="modal-footer">
                   <button type="button" className="btn-secondary" onClick={() => setShowEditModal(false)}>
                     Cancel
@@ -580,7 +547,6 @@ export default function StaffSchedule() {
         </div>
       )}
 
-      {/* Assign Schedule Modal */}
       {showScheduleModal && selectedStaff && (
         <div className="modal-overlay" onClick={() => setShowScheduleModal(false)}>
           <div className="modal-content schedule-modal" onClick={(e) => e.stopPropagation()}>
@@ -603,12 +569,10 @@ export default function StaffSchedule() {
                   <p>☀️ Day Shift: 9:00 AM - 6:00 PM</p>
                   <p>🌙 Night Shift: 6:00 PM - 9:00 AM</p>
                 </div>
-
                 <div className="form-group">
                   <label>Week Start Date *</label>
                   <input type="date" name="startDate" defaultValue={selectedDate} required />
                 </div>
-
                 <div className="form-group">
                   <label>Shift Assignment *</label>
                   <select name="shift" required>
@@ -617,7 +581,6 @@ export default function StaffSchedule() {
                     <option value="Night Shift">Night Shift (6:00 PM - 9:00 AM)</option>
                   </select>
                 </div>
-
                 <div className="week-preview">
                   <h4>Week Schedule Preview:</h4>
                   <div className="week-days">
@@ -628,7 +591,6 @@ export default function StaffSchedule() {
                     ))}
                   </div>
                 </div>
-
                 <div className="modal-footer">
                   <button type="button" className="btn-secondary" onClick={() => setShowScheduleModal(false)}>
                     Cancel

@@ -1,6 +1,6 @@
 // src/components/EquipmentTracking.jsx
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import API from "../api/api";
 import { ActivityLogger } from "../utils/activityTracker";
 import "../styles/EquipmentTracking.css";
 
@@ -18,7 +18,6 @@ export default function EquipmentTracking() {
   const categories = ["all", "Diagnostic", "Life Support", "Monitoring", "Emergency", "Surgical"];
   const statuses = ["all", "available", "in-use", "maintenance"];
 
-  // Fetch equipment from MongoDB
   useEffect(() => {
     fetchEquipment();
   }, []);
@@ -26,11 +25,11 @@ export default function EquipmentTracking() {
   const fetchEquipment = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://localhost:5001/api/equipment');
+      const response = await API.get('/equipment');
       setEquipment(response.data || []);
       setError(null);
     } catch (err) {
-      setError('Failed to fetch equipment. Make sure the backend is running.');
+      setError('Failed to fetch equipment');
       console.error('Error fetching equipment:', err);
       setEquipment([]);
     } finally {
@@ -55,20 +54,16 @@ export default function EquipmentTracking() {
     return matchesCategory && matchesStatus && matchesSearch;
   });
 
-  // CREATE - Add new equipment
   const handleAddEquipment = async (formData) => {
     try {
-      const response = await axios.post('http://localhost:5001/api/equipment', {
+      const response = await API.post('/equipment', {
         ...formData,
         status: "available",
         lastMaintenance: new Date().toISOString(),
         assignedTo: null
       });
       setEquipment([...equipment, response.data]);
-      
-      // Log activity AFTER successful operation
       ActivityLogger.equipmentAdded(formData.name);
-      
       setShowAddModal(false);
       setError(null);
     } catch (err) {
@@ -78,24 +73,19 @@ export default function EquipmentTracking() {
     }
   };
 
-  // UPDATE - Change equipment status
   const handleStatusChange = async (eqId, newStatus) => {
     try {
       const currentEquipment = equipment.find(e => e._id === eqId);
       let updateData = { status: newStatus };
       
-      // If moving to maintenance, update lastMaintenance and calculate nextMaintenance
       if (newStatus === "maintenance") {
         const maintenanceDate = new Date();
         updateData.lastMaintenance = maintenanceDate.toISOString();
         updateData.maintenanceStartDate = maintenanceDate.toISOString();
-        
-        // Log activity
         ActivityLogger.equipmentMaintenance(currentEquipment.name);
         
-        // Create notification for maintenance start
         try {
-          await axios.post('http://localhost:5001/api/notifications', {
+          await API.post('/notifications', {
             type: 'equipment',
             title: 'Equipment Maintenance Started',
             message: `${currentEquipment.name} (${currentEquipment.equipmentId}) has been moved to maintenance at ${currentEquipment.location}`,
@@ -106,23 +96,19 @@ export default function EquipmentTracking() {
         }
       }
       
-      // If completing maintenance (moving from maintenance to available)
       if (newStatus === "available") {
         if (currentEquipment && currentEquipment.status === "maintenance") {
           const completionDate = new Date();
           const nextMaintenanceDate = new Date(completionDate);
-          nextMaintenanceDate.setDate(nextMaintenanceDate.getDate() + 30); // 30 days from now
+          nextMaintenanceDate.setDate(nextMaintenanceDate.getDate() + 30);
           
           updateData.maintenanceCompletionDate = completionDate.toISOString();
           updateData.nextMaintenance = nextMaintenanceDate.toISOString();
           updateData.assignedTo = null;
-          
-          // Log activity
           ActivityLogger.equipmentMaintenanceComplete(currentEquipment.name);
           
-          // Create notification for maintenance completion
           try {
-            await axios.post('http://localhost:5001/api/notifications', {
+            await API.post('/notifications', {
               type: 'equipment',
               title: 'Equipment Maintenance Completed',
               message: `${currentEquipment.name} (${currentEquipment.equipmentId}) maintenance completed. Next maintenance scheduled for ${nextMaintenanceDate.toLocaleDateString()}`,
@@ -134,12 +120,11 @@ export default function EquipmentTracking() {
         }
       }
       
-      // If releasing from in-use to available
       if (newStatus === "available" && currentEquipment?.status === "in-use") {
         updateData.assignedTo = null;
       }
 
-      const response = await axios.patch(`http://localhost:5001/api/equipment/${eqId}/status`, updateData);
+      const response = await API.patch(`/equipment/${eqId}/status`, updateData);
       setEquipment(equipment.map(eq => eq._id === eqId ? response.data : eq));
       setError(null);
     } catch (err) {
@@ -149,20 +134,15 @@ export default function EquipmentTracking() {
     }
   };
 
-  // UPDATE - Assign equipment
   const handleAssignEquipment = async (eqId, assignedTo) => {
     try {
       const currentEquipment = equipment.find(e => e._id === eqId);
-      
-      const response = await axios.patch(`http://localhost:5001/api/equipment/${eqId}/assign`, {
+      const response = await API.patch(`/equipment/${eqId}/assign`, {
         assignedTo,
         status: "in-use"
       });
       setEquipment(equipment.map(eq => eq._id === eqId ? response.data : eq));
-      
-      // Log activity AFTER successful operation
       ActivityLogger.equipmentAssigned(currentEquipment.name);
-      
       setError(null);
     } catch (err) {
       setError('Failed to assign equipment');
@@ -171,10 +151,9 @@ export default function EquipmentTracking() {
     }
   };
 
-  // UPDATE - Edit equipment
   const handleUpdateEquipment = async (eqId, formData) => {
     try {
-      const response = await axios.put(`http://localhost:5001/api/equipment/${eqId}`, formData);
+      const response = await API.put(`/equipment/${eqId}`, formData);
       setEquipment(equipment.map(eq => eq._id === eqId ? response.data : eq));
       setShowEditModal(false);
       setSelectedEquipment(null);
@@ -186,14 +165,13 @@ export default function EquipmentTracking() {
     }
   };
 
-  // DELETE - Remove equipment
   const handleDeleteEquipment = async (eqId) => {
     if (!window.confirm('Are you sure you want to delete this equipment?')) {
       return;
     }
     
     try {
-      await axios.delete(`http://localhost:5001/api/equipment/${eqId}`);
+      await API.delete(`/equipment/${eqId}`);
       setEquipment(equipment.filter(eq => eq._id !== eqId));
       setError(null);
     } catch (err) {
@@ -247,7 +225,6 @@ export default function EquipmentTracking() {
         </div>
       )}
 
-      {/* Stats */}
       <div className="equipment-stats">
         <div className="stat-card">
           <div className="stat-icon">📦</div>
@@ -279,7 +256,6 @@ export default function EquipmentTracking() {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="equipment-filters">
         <div className="filter-left">
           <input
@@ -314,7 +290,6 @@ export default function EquipmentTracking() {
         </div>
       </div>
 
-      {/* Equipment Grid */}
       <div className="equipment-grid">
         {filteredEquipment.length === 0 ? (
           <div className="empty-state">
@@ -423,7 +398,7 @@ export default function EquipmentTracking() {
         )}
       </div>
 
-      {/* Add Equipment Modal */}
+      {/* Add & Edit Modals - keeping same as original */}
       {showAddModal && (
         <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -450,12 +425,10 @@ export default function EquipmentTracking() {
                   <label>Equipment ID *</label>
                   <input type="text" name="equipmentId" placeholder="e.g., EQ-001" required />
                 </div>
-
                 <div className="form-group">
                   <label>Equipment Name *</label>
                   <input type="text" name="name" placeholder="e.g., X-Ray Machine" required />
                 </div>
-
                 <div className="form-row">
                   <div className="form-group">
                     <label>Category *</label>
@@ -471,11 +444,9 @@ export default function EquipmentTracking() {
                     <input type="text" name="location" placeholder="e.g., Radiology Room 1" required />
                   </div>
                 </div>
-
                 <p style={{ fontSize: '13px', color: '#666', marginTop: '10px' }}>
                   * Next maintenance will be automatically set to 30 days from now
                 </p>
-
                 <div className="modal-footer">
                   <button type="button" className="btn-secondary" onClick={() => setShowAddModal(false)}>
                     Cancel
@@ -490,7 +461,6 @@ export default function EquipmentTracking() {
         </div>
       )}
 
-      {/* Edit Equipment Modal */}
       {showEditModal && selectedEquipment && (
         <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -512,7 +482,6 @@ export default function EquipmentTracking() {
                   <label>Equipment Name *</label>
                   <input type="text" name="name" defaultValue={selectedEquipment.name} required />
                 </div>
-
                 <div className="form-row">
                   <div className="form-group">
                     <label>Category *</label>
@@ -527,7 +496,6 @@ export default function EquipmentTracking() {
                     <input type="text" name="location" defaultValue={selectedEquipment.location} required />
                   </div>
                 </div>
-
                 <div className="modal-footer">
                   <button type="button" className="btn-secondary" onClick={() => setShowEditModal(false)}>
                     Cancel

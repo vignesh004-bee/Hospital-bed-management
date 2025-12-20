@@ -1,6 +1,6 @@
 // src/components/Notifications.jsx
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import API from "../api/api";
 import "../styles/Notifications.css";
 
 export default function Notifications() {
@@ -12,7 +12,6 @@ export default function Notifications() {
 
   useEffect(() => {
     fetchNotifications();
-    // Refresh notifications every 30 seconds
     const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -20,7 +19,7 @@ export default function Notifications() {
   const fetchNotifications = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://localhost:5001/api/notifications');
+      const response = await API.get('/notifications');
       setNotifications(response.data || []);
       setError(null);
     } catch (err) {
@@ -48,11 +47,10 @@ export default function Notifications() {
   };
 
   const handleMarkAsRead = async (id) => {
-    // Skip system notifications
     if (id.startsWith('SYS-')) return;
     
     try {
-      await axios.patch(`http://localhost:5001/api/notifications/${id}/read`);
+      await API.patch(`/notifications/${id}/read`);
       setNotifications(notifications.map(n => 
         n._id === id ? { ...n, read: true } : n
       ));
@@ -64,7 +62,7 @@ export default function Notifications() {
 
   const handleMarkAllAsRead = async () => {
     try {
-      await axios.patch('http://localhost:5001/api/notifications/mark-all/read');
+      await API.patch('/notifications/mark-all/read');
       setNotifications(notifications.map(n => ({ ...n, read: true })));
       setError(null);
     } catch (err) {
@@ -74,14 +72,13 @@ export default function Notifications() {
   };
 
   const handleDelete = async (id) => {
-    // Skip system notifications
     if (id.startsWith('SYS-')) {
       alert('System notifications cannot be deleted');
       return;
     }
     
     try {
-      await axios.delete(`http://localhost:5001/api/notifications/${id}`);
+      await API.delete(`/notifications/${id}`);
       setNotifications(notifications.filter(n => n._id !== id));
       setError(null);
     } catch (err) {
@@ -95,8 +92,7 @@ export default function Notifications() {
     }
     
     try {
-      await axios.delete('http://localhost:5001/api/notifications/clear/all');
-      // Keep only system notifications
+      await API.delete('/notifications/clear/all');
       setNotifications(notifications.filter(n => n.isSystem));
       setError(null);
     } catch (err) {
@@ -180,7 +176,6 @@ export default function Notifications() {
         </div>
       )}
 
-      {/* Stats */}
       <div className="notifications-stats">
         <div className="stat-card">
           <div className="stat-icon">🔔</div>
@@ -212,7 +207,6 @@ export default function Notifications() {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="notifications-filters">
         <div className="filter-left">
           <select 
@@ -241,7 +235,6 @@ export default function Notifications() {
         </div>
       </div>
 
-      {/* Notifications List */}
       <div className="notifications-list">
         {filteredNotifications.length === 0 ? (
           <div className="empty-state">

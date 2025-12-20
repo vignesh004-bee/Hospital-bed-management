@@ -1,6 +1,6 @@
 // src/components/TransferRequests.jsx
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import API from "../api/api";
 import { ActivityLogger } from "../utils/activityTracker";
 import "../styles/TransferRequests.css";
 
@@ -19,7 +19,7 @@ export default function TransferRequests() {
   const fetchTransferRequests = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://localhost:5001/api/transfers');
+      const response = await API.get('/transfers');
       setRequests(response.data || []);
       setError(null);
     } catch (err) {
@@ -51,14 +51,11 @@ export default function TransferRequests() {
   const handleApprove = async (requestId) => {
     try {
       const request = requests.find(r => r._id === requestId);
-      const response = await axios.patch(`http://localhost:5001/api/transfers/${requestId}/approve`, {
+      const response = await API.patch(`/transfers/${requestId}/approve`, {
         approvedBy: "Admin"
       });
       setRequests(requests.map(r => r._id === requestId ? response.data : r));
-      
-      // Log activity AFTER successful operation
       ActivityLogger.transferApproved(request.patientName);
-      
       setError(null);
       alert('Transfer request approved successfully!');
     } catch (err) {
@@ -75,12 +72,9 @@ export default function TransferRequests() {
     
     try {
       const request = requests.find(r => r._id === requestId);
-      const response = await axios.patch(`http://localhost:5001/api/transfers/${requestId}/reject`);
+      const response = await API.patch(`/transfers/${requestId}/reject`);
       setRequests(requests.map(r => r._id === requestId ? response.data : r));
-      
-      // Log activity AFTER successful operation
       ActivityLogger.transferRejected(request.patientName);
-      
       setError(null);
       alert('Transfer request rejected.');
     } catch (err) {
@@ -92,7 +86,7 @@ export default function TransferRequests() {
 
   const handleStartTransfer = async (requestId) => {
     try {
-      const response = await axios.patch(`http://localhost:5001/api/transfers/${requestId}/start`);
+      const response = await API.patch(`/transfers/${requestId}/start`);
       setRequests(requests.map(r => r._id === requestId ? response.data : r));
       setError(null);
     } catch (err) {
@@ -105,12 +99,9 @@ export default function TransferRequests() {
   const handleCompleteTransfer = async (requestId) => {
     try {
       const request = requests.find(r => r._id === requestId);
-      const response = await axios.patch(`http://localhost:5001/api/transfers/${requestId}/complete`);
+      const response = await API.patch(`/transfers/${requestId}/complete`);
       setRequests(requests.map(r => r._id === requestId ? response.data : r));
-      
-      // Log activity AFTER successful operation
       ActivityLogger.transferCompleted(request.patientName);
-      
       setError(null);
       alert('Transfer completed! Patient record has been updated.');
     } catch (err) {
@@ -126,7 +117,7 @@ export default function TransferRequests() {
     }
     
     try {
-      await axios.delete(`http://localhost:5001/api/transfers/${requestId}`);
+      await API.delete(`/transfers/${requestId}`);
       setRequests(requests.filter(r => r._id !== requestId));
       setError(null);
     } catch (err) {
@@ -188,7 +179,6 @@ export default function TransferRequests() {
         </div>
       )}
 
-      {/* Stats */}
       <div className="transfer-stats">
         <div className="stat-card">
           <div className="stat-icon">📋</div>
@@ -220,7 +210,6 @@ export default function TransferRequests() {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="transfer-filters">
         <div className="filter-left">
           <input
@@ -255,7 +244,6 @@ export default function TransferRequests() {
         </div>
       </div>
 
-      {/* Requests Grid */}
       <div className="requests-grid">
         {filteredRequests.length === 0 ? (
           <div className="empty-state">
